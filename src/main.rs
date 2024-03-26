@@ -79,26 +79,6 @@ fn main() {
                         }
                     }
                 };
-
-                /*
-                if link.url.starts_with("https://") || link.url.starts_with("http://") {
-                    return;
-                }
-
-                let file = match mdparser::links::find_path(link, &vault_root.to_path_buf()) {
-                    Ok(f) => f,
-                    Err(_) => {
-                        if !not_remove_unfound {
-                            node.children().for_each(|t| node.insert_before(t));
-                            node.detach();
-                        }
-                        return;
-                    }
-                };
-
-                let n = node.parent();
-                println!("{n:#?}");
-                */
             }
         }),
         _ => (),
