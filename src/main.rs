@@ -1,4 +1,5 @@
 use core::panic;
+use std::borrow::Borrow;
 
 use clap::{ArgAction, Parser, Subcommand};
 use clio::*;
@@ -48,7 +49,6 @@ enum Commands {
         #[command(subcommand)]
         command: FrontmatterCommands,
     },
-    Not {},
     Convert {
         #[arg(short, long)]
         format: convert::Formats,
@@ -87,8 +87,13 @@ fn main() {
     let ast = comrak::parse_document(&arena, &file, &mdparser::utils::default_options());
 
     if let Commands::Convert { format } = &cli.command {
+        let r = match format {
+            convert::Formats::TumblrNPF => convert::to_tumblr_npf(&ast),
+        };
+        println!("{:#?}", r.borrow());
         return;
     }
+
     match &cli.command {
         Commands::Links {
             path_root,

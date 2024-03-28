@@ -1,3 +1,7 @@
+use std::cell::RefCell;
+
+use comrak::nodes::NodeValue;
+
 pub fn default_options() -> comrak::Options {
     let mut opts = comrak::Options::default();
 
@@ -18,6 +22,26 @@ where
     for c in node.children() {
         iter_nodes(c, f)
     }
+}
+
+pub fn iter_nodes_shallow<'a, F>(node: &'a comrak::nodes::AstNode<'a>, f: &F)
+where
+    F: Fn(&'a comrak::nodes::AstNode<'a>),
+{
+    for c in node.children() {
+        f(c)
+    }
+}
+
+pub fn extract_text<'a>(node: &'a comrak::nodes::AstNode<'a>) -> String {
+    let text = RefCell::new(String::new());
+    iter_nodes(node, &|node| {
+        if let NodeValue::Text(t) = &node.data.borrow().value {
+            text.borrow_mut().push_str(&t);
+        }
+    });
+    let r = text.borrow().to_string();
+    r
 }
 
 pub fn iter_nodes_r<'a, F, T>(node: &'a comrak::nodes::AstNode<'a>, f: &F) -> Option<T>
