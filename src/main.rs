@@ -5,6 +5,7 @@ use clio::*;
 use comrak::nodes::NodeValue;
 
 use mdparser::{
+    convert,
     frontmatter::{self, Frontmatter},
     links, utils,
 };
@@ -48,6 +49,10 @@ enum Commands {
         command: FrontmatterCommands,
     },
     Not {},
+    Convert {
+        #[arg(short, long)]
+        format: convert::Formats,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -81,6 +86,9 @@ fn main() {
     let arena = comrak::Arena::new();
     let ast = comrak::parse_document(&arena, &file, &mdparser::utils::default_options());
 
+    if let Commands::Convert { format } = &cli.command {
+        return;
+    }
     match &cli.command {
         Commands::Links {
             path_root,
