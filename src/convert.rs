@@ -49,6 +49,18 @@ pub fn to_tumblr_npf<'a>(ast: &'a Node<'a, RefCell<Ast>>) -> Result<RefCell<NPF>
                         });
                         text.push_str(&format!("{} ", &t))
                     }
+                    NodeValue::Emph => {
+                        let t = utils::extract_text(node);
+                        formatting.push(Formatting {
+                            r#type: FormattingType::Italic,
+                            start: text.chars().count(),
+                            end: text.chars().count() + t.chars().count() + 1,
+                            url: None,
+                            color: None,
+                            blog: None,
+                        });
+                        text.push_str(&format!("{} ", &t))
+                    }
                     NodeValue::Text(t) => text.push_str(&format!("{} ", &t)),
                     _ => (),
                 }
