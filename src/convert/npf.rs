@@ -34,6 +34,7 @@ pub mod content_types {
     pub mod text {
         use serde::{Deserialize, Serialize};
         #[derive(Debug, Clone, Deserialize, Serialize)]
+        #[serde(rename_all = "snake_case")]
         pub enum Subtypes {
             Heading1,
             Heading2,
@@ -45,6 +46,7 @@ pub mod content_types {
             UnorderedListItem,
         }
 
+        #[serde_with::skip_serializing_none]
         #[derive(Debug, Clone, Deserialize, Serialize)]
         pub struct Formatting {
             pub start: usize,
@@ -56,6 +58,7 @@ pub mod content_types {
         }
 
         #[derive(Debug, Clone, Deserialize, Serialize)]
+        #[serde(rename_all = "snake_case")]
         pub enum FormattingType {
             Bold,
             Italic,
@@ -66,6 +69,7 @@ pub mod content_types {
         }
     }
 
+    #[serde_with::skip_serializing_none]
     #[derive(Debug, Deserialize, Serialize, Clone)]
     pub struct Text<'a> {
         r#type: &'a str,
@@ -95,6 +99,7 @@ pub mod content_types {
         }
     }
 
+    #[serde_with::skip_serializing_none]
     #[derive(Debug, Deserialize, Serialize, Clone)]
     pub struct Image<'a> {
         r#type: &'a str,
@@ -130,6 +135,7 @@ pub mod content_types {
         }
     }
 
+    #[serde_with::skip_serializing_none]
     #[derive(Debug, Deserialize, Serialize, Clone)]
     pub struct Link<'a> {
         r#type: &'a str,
@@ -168,6 +174,7 @@ pub mod content_types {
         }
     }
 
+    #[serde_with::skip_serializing_none]
     #[derive(Debug, Deserialize, Serialize, Clone)]
     pub struct Audio<'a> {
         r#type: &'a str,
@@ -234,6 +241,7 @@ pub mod content_types {
         }
     }
 
+    #[serde_with::skip_serializing_none]
     #[derive(Debug, Deserialize, Serialize, Clone)]
     pub struct Video<'a> {
         r#type: &'a str,
@@ -312,6 +320,7 @@ pub mod objects {
         pub url: String,
     }
 
+    #[serde_with::skip_serializing_none]
     #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct Media {
         pub r#type: String,
@@ -321,6 +330,7 @@ pub mod objects {
         pub poster: Option<MediaPoster>,
     }
 
+    #[serde_with::skip_serializing_none]
     #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct MediaPoster {
         pub r#type: String,
