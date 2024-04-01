@@ -131,6 +131,33 @@ pub fn to_tumblr_npf<'a>(ast: &'a Node<'a, RefCell<Ast>>) -> Result<RefCell<NPF>
                     .for_each(|b| npf.borrow_mut().content.push(b.clone()));
             */
         }
+        NodeValue::Heading(h) => {
+            let mut text = content_types::Text::from(utils::extract_text(node));
+
+            if h.level == 1 {
+                text.subtype = Some(Subtypes::Heading1);
+            } else if h.level == 2 {
+                text.subtype = Some(Subtypes::Heading2);
+            } else if h.level == 3 {
+                text.subtype = Some(Subtypes::UnorderedListItem);
+                let formatting = Formatting {
+                    r#type: FormattingType::Bold,
+                    start: 0,
+                    end: text.text.chars().count() + 1,
+                    url: None,
+                    color: None,
+                    blog: None,
+                };
+                match text.formatting {
+                    Some(ref mut f) => f.push(formatting),
+                    None => text.formatting = Some(vec![formatting]),
+                };
+            } else {
+                text.subtype = Some(Subtypes::UnorderedListItem);
+            }
+
+            npf.borrow_mut().content.push(ContentType::Text(text));
+        }
         _ => (),
     });
 
