@@ -12,7 +12,7 @@ impl<'a> NPF<'a> {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum ContentType<'a> {
     #[serde(borrow)]
     Text(content_types::Text<'a>),
@@ -33,7 +33,7 @@ pub mod content_types {
 
     pub mod text {
         use serde::{Deserialize, Serialize};
-        #[derive(Debug, Deserialize, Serialize)]
+        #[derive(Debug, Clone, Deserialize, Serialize)]
         pub enum Subtypes {
             Heading1,
             Heading2,
@@ -66,7 +66,7 @@ pub mod content_types {
         }
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Deserialize, Serialize, Clone)]
     pub struct Text<'a> {
         r#type: &'a str,
         pub text: String,
@@ -95,7 +95,7 @@ pub mod content_types {
         }
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Deserialize, Serialize, Clone)]
     pub struct Image<'a> {
         r#type: &'a str,
         pub media: Vec<objects::Media>,
@@ -130,7 +130,7 @@ pub mod content_types {
         }
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Deserialize, Serialize, Clone)]
     pub struct Link<'a> {
         r#type: &'a str,
         pub url: String,
@@ -168,7 +168,7 @@ pub mod content_types {
         }
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Deserialize, Serialize, Clone)]
     pub struct Audio<'a> {
         r#type: &'a str,
         pub url: Option<String>,
@@ -234,7 +234,7 @@ pub mod content_types {
         }
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Deserialize, Serialize, Clone)]
     pub struct Video<'a> {
         r#type: &'a str,
         pub media: Option<objects::Media>,
@@ -312,7 +312,7 @@ pub mod objects {
         pub url: String,
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct Media {
         pub r#type: String,
         pub url: String,
@@ -321,7 +321,7 @@ pub mod objects {
         pub poster: Option<MediaPoster>,
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct MediaPoster {
         pub r#type: String,
         pub url: String,
@@ -329,7 +329,7 @@ pub mod objects {
         pub height: Option<String>,
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct Attribution {
         pub r#type: String,
         pub url: String,
@@ -337,7 +337,7 @@ pub mod objects {
         pub blug: Blog,
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct Post {
         pub id: u64,
     }
