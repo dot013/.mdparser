@@ -4,10 +4,8 @@ use std::{cell::RefCell, fmt::Error};
 use crate::utils;
 
 mod npf;
-use npf::{
-    content_types::{self, text::Formatting, text::FormattingType},
-    ContentType, NPF,
-};
+use npf::content_types::text::{Formatting, FormattingType, Subtypes};
+use npf::{content_types, ContentType, NPF};
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum Formats {
@@ -56,9 +54,10 @@ pub fn to_tumblr_npf<'a>(ast: &'a Node<'a, RefCell<Ast>>) -> Result<RefCell<NPF>
                 }
             });
 
-            let mut block =
-                content_types::Text::from(text.borrow().trim().to_string().replace("  ", " "));
-            block.formating = if formatting.borrow().len() > 0 {
+            let text = text.borrow().trim().to_string().replace("  ", " ");
+            let mut block = content_types::Text::from(text);
+
+            block.formatting = if formatting.borrow().len() > 0 {
                 Some(formatting.borrow().to_vec())
             } else {
                 None

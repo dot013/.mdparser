@@ -71,8 +71,8 @@ pub mod content_types {
         r#type: &'a str,
         pub text: String,
         pub subtype: Option<text::Subtypes>,
-        pub ident_level: Option<u8>,
-        pub formating: Option<Vec<text::Formatting>>,
+        pub indent_level: Option<u8>,
+        pub formatting: Option<Vec<text::Formatting>>,
     }
     impl<'a> Text<'a> {
         pub fn new() -> Text<'a> {
@@ -80,8 +80,8 @@ pub mod content_types {
                 r#type: "text",
                 text: String::new(),
                 subtype: None,
-                ident_level: None,
-                formating: None,
+                indent_level: None,
+                formatting: None,
             }
         }
         pub fn from(str: String) -> Text<'a> {
@@ -89,8 +89,8 @@ pub mod content_types {
                 r#type: "text",
                 text: str,
                 subtype: None,
-                ident_level: None,
-                formating: None,
+                indent_level: None,
+                formatting: None,
             }
         }
     }
