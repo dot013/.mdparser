@@ -249,7 +249,7 @@ pub mod content_types {
         pub url: Option<String>,
         pub provider: Option<String>,
         pub embed_html: Option<String>,
-        pub embed_iframe: Option<String>,
+        pub embed_iframe: Option<objects::IFrame>,
         pub embed_url: Option<String>,
         pub poster: Option<Vec<objects::Media>>,
         pub filmstrip: Option<Vec<objects::Media>>,
@@ -323,11 +323,23 @@ pub mod objects {
     #[serde_with::skip_serializing_none]
     #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct Media {
-        pub r#type: String,
+        pub r#type: Option<String>,
         pub url: String,
-        pub width: i32,
-        pub height: i32,
+        pub width: Option<i32>,
+        pub height: Option<i32>,
         pub poster: Option<MediaPoster>,
+        pub provider: Option<String>,
+        pub original_dimensions_missing: Option<bool>,
+        pub cropped: Option<bool>,
+        pub has_original_dimensions: Option<bool>,
+    }
+
+    #[serde_with::skip_serializing_none]
+    #[derive(Debug, Clone, Deserialize, Serialize)]
+    pub struct IFrame {
+        pub url: String,
+        pub width: Option<i32>,
+        pub height: Option<i32>,
     }
 
     #[serde_with::skip_serializing_none]
