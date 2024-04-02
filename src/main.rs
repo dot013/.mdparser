@@ -1,5 +1,5 @@
 use core::panic;
-use std::borrow::Borrow;
+use std::io::Write;
 
 use clap::{ArgAction, Parser, Subcommand};
 use clio::*;
@@ -86,11 +86,19 @@ fn main() {
     let arena = comrak::Arena::new();
     let ast = comrak::parse_document(&arena, &file, &mdparser::utils::default_options());
 
+    // println!("{ast:#?}");
+
     if let Commands::Convert { format } = &cli.command {
         let r = match format {
             convert::Formats::TumblrNPF => convert::to_tumblr_npf(&ast),
         };
-        println!("{:#?}", r.borrow());
+        // println!("{}", serde_json::to_string_pretty(&r.unwrap()).unwrap());
+        let _ = &cli.output.write(
+            serde_json::to_string_pretty(&r.unwrap())
+                .unwrap()
+                .as_str()
+                .as_bytes(),
+        );
         return;
     }
 
