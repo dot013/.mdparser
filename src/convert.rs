@@ -63,8 +63,10 @@ pub fn to_tumblr_npf<'a>(ast: &'a Node<'a, RefCell<Ast>>) -> Result<RefCell<NPF>
                     }
                     NodeValue::Text(t) => text.push_str(&format!("{} ", &t)),
                     _ => (),
-                }
-            });
+                };
+
+                Ok::<(), Error>(())
+            })?;
 
             let text = text.borrow().trim().to_string().replace("  ", " ");
             let mut block = content_types::Text::from(text);
@@ -76,43 +78,40 @@ pub fn to_tumblr_npf<'a>(ast: &'a Node<'a, RefCell<Ast>>) -> Result<RefCell<NPF>
             };
 
             npf.borrow_mut().content.push(ContentType::Text(block));
+
+            Ok::<(), Error>(())
         }
         NodeValue::BlockQuote => {
-            let block_quote = to_tumblr_npf(node);
+            let block_quote = to_tumblr_npf(node)?;
             let final_block = RefCell::new(content_types::Text::new());
 
-            block_quote
-                .unwrap()
-                .borrow_mut()
-                .content
-                .iter_mut()
-                .for_each(|b| {
-                    if let ContentType::Text(t) = b {
-                        let mut fb = final_block.borrow_mut();
-                        let text_len = fb.text.chars().count();
+            block_quote.borrow_mut().content.iter_mut().for_each(|b| {
+                if let ContentType::Text(t) = b {
+                    let mut fb = final_block.borrow_mut();
+                    let text_len = fb.text.chars().count();
 
-                        if let Some(formattings) = &t.formatting {
-                            for formatting in formattings {
-                                match fb.formatting {
-                                    Some(ref mut v) => v.push(Formatting {
+                    if let Some(formattings) = &t.formatting {
+                        for formatting in formattings {
+                            match fb.formatting {
+                                Some(ref mut v) => v.push(Formatting {
+                                    start: text_len + formatting.start,
+                                    end: text_len + formatting.end,
+                                    ..formatting.clone()
+                                }),
+                                None => {
+                                    fb.formatting = Some(vec![Formatting {
                                         start: text_len + formatting.start,
                                         end: text_len + formatting.end,
                                         ..formatting.clone()
-                                    }),
-                                    None => {
-                                        fb.formatting = Some(vec![Formatting {
-                                            start: text_len + formatting.start,
-                                            end: text_len + formatting.end,
-                                            ..formatting.clone()
-                                        }]);
-                                    }
+                                    }]);
                                 }
                             }
                         }
-                        fb.text.push_str(&format!("{}\n\n", &t.text));
-                    } else {
                     }
-                });
+                    fb.text.push_str(&format!("{}\n\n", &t.text));
+                } else {
+                }
+            });
 
             println!("{node:#?}");
             println!("{:#?}", final_block.borrow());
@@ -130,6 +129,7 @@ pub fn to_tumblr_npf<'a>(ast: &'a Node<'a, RefCell<Ast>>) -> Result<RefCell<NPF>
                     })
                     .for_each(|b| npf.borrow_mut().content.push(b.clone()));
             */
+            Ok(())
         }
         NodeValue::Heading(h) => {
             let mut text = content_types::Text::from(utils::extract_text(node));
@@ -157,9 +157,11 @@ pub fn to_tumblr_npf<'a>(ast: &'a Node<'a, RefCell<Ast>>) -> Result<RefCell<NPF>
             }
 
             npf.borrow_mut().content.push(ContentType::Text(text));
+
+            Ok(())
         }
-        _ => (),
-    });
+        _ => Ok(()),
+    })?;
 
     Ok(npf)
 }

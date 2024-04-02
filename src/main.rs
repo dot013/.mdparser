@@ -94,7 +94,7 @@ fn main() {
         return;
     }
 
-    match &cli.command {
+    let _: Result<()> = match &cli.command {
         Commands::Links {
             path_root,
             alias_prop,
@@ -124,6 +124,7 @@ fn main() {
                     }
                 };
             }
+            Ok(())
         }),
         Commands::Frontmatter { command } => utils::iter_nodes(&ast, &|node| {
             if let NodeValue::FrontMatter(ref mut f) = &mut node.data.borrow_mut().value {
@@ -162,8 +163,9 @@ fn main() {
                     Err(e) => panic!("{e:#?}"),
                 };
             }
+            Ok(())
         }),
-        _ => (),
+        _ => Ok(()),
     };
 
     let _ = comrak::format_commonmark(&ast, &mdparser::utils::default_options(), &mut cli.output);
