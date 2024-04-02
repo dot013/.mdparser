@@ -113,22 +113,6 @@ pub fn to_tumblr_npf<'a>(ast: &'a Node<'a, RefCell<Ast>>) -> Result<RefCell<NPF>
                 }
             });
 
-            println!("{node:#?}");
-            println!("{:#?}", final_block.borrow());
-            /*
-                block_quote
-                    .unwrap()
-                    .borrow_mut()
-                    .content
-                    .iter_mut()
-                    .map(|b| {
-                        if let ContentType::Text(ref mut t) = b {
-                            t.subtype = Some(Subtypes::Indented);
-                        }
-                        b
-                    })
-                    .for_each(|b| npf.borrow_mut().content.push(b.clone()));
-            */
             Ok(())
         }
         NodeValue::Heading(h) => {
