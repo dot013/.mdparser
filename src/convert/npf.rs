@@ -13,6 +13,7 @@ impl<'a> NPF<'a> {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(untagged)]
 pub enum ContentType<'a> {
     #[serde(borrow)]
     Text(content_types::Text<'a>),
