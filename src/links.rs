@@ -54,6 +54,7 @@ pub fn parse<'a>(
     if let Some(a) = &opts.alias_prop {
         let alias = match get_alias(&path, &a) {
             Ok(a) => a,
+            Err(GetAliasError::NotMarkdown) => return Ok(()),
             Err(err) => return Err(ParsingError::AliasErr(err)),
         };
         if let Some(v) = alias {
@@ -74,8 +75,18 @@ pub fn parse<'a>(
 pub enum GetAliasError {
     IoErr(io::Error),
     YamlErr(serde_yaml::Error),
+    NotMarkdown,
 }
 pub fn get_alias(path: &PathBuf, alias_prop: &String) -> Result<Option<String>, GetAliasError> {
+    if let Some(ext) = path.extension() {
+        match ext.to_str().unwrap_or_default() {
+            "md" | "markdown" => (),
+            _ => return Err(GetAliasError::NotMarkdown),
+        };
+    } else {
+        return Err(GetAliasError::NotMarkdown);
+    }
+
     let file = match fs::read_to_string(path) {
         Ok(f) => f,
         Err(err) => return Err(GetAliasError::IoErr(err)),
