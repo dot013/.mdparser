@@ -1,11 +1,12 @@
-use comrak::{arena_tree::Node, nodes::Ast, nodes::NodeValue};
 use std::{cell::RefCell, fmt::Error};
 
-use crate::utils;
+use comrak::{arena_tree::Node, nodes::Ast, nodes::NodeValue};
 
 mod npf;
+
+use crate::utils;
 use npf::content_types::text::{Formatting, FormattingType, Subtypes};
-use npf::{content_types, ContentType, NPF};
+use npf::{content_types, objects::Media, ContentType, NPF};
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum Formats {
@@ -62,6 +63,41 @@ pub fn to_tumblr_npf<'a>(ast: &'a Node<'a, RefCell<Ast>>) -> Result<RefCell<NPF>
                         text.push_str(&format!("{} ", &t))
                     }
                     NodeValue::Text(t) => text.push_str(&format!("{} ", &t)),
+                    NodeValue::Image(i) => {
+                        if let Ok(u) = url::Url::parse(&i.url) {
+                            if [
+                                Some("www.youtube.com"),
+                                Some("youtube.com"),
+                                Some("youtu.be"),
+                            ]
+                            .contains(&u.host_str())
+                            {
+                                let mut video = content_types::Video::from(String::from(u));
+                                video.provider = Some(String::from("youtube"));
+                                video.embed_iframe = Some(npf::objects::IFrame {
+                                    url: String::from(&video.url.clone().unwrap()),
+                                    width: None,
+                                    height: None,
+                                });
+                                npf.borrow_mut().content.push(ContentType::Video(video));
+                            }
+                        } else {
+                            let mut image = content_types::Image::from(vec![Media {
+                                r#type: None,
+                                url: String::from(&i.url),
+                                provider: None,
+                                poster: None,
+                                width: None,
+                                height: None,
+                                has_original_dimensions: None,
+                                cropped: None,
+                                original_dimensions_missing: None,
+                            }]);
+                            image.caption = Some(String::from(&i.title));
+                            image.alt_text = Some(utils::extract_text(node));
+                            npf.borrow_mut().content.push(ContentType::Image(image));
+                        }
+                    }
                     _ => (),
                 };
 
