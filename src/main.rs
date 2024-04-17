@@ -1,4 +1,3 @@
-use core::panic;
 use std::io::Write;
 
 use clap::{ArgAction, Parser, Subcommand};
@@ -35,9 +34,6 @@ enum Commands {
 
         #[arg(short, long, num_args = 2, value_names = ["FROM", "TO"])]
         replace_url: Vec<String>,
-
-        #[arg(long, default_value = ".")]
-        root: clio::ClioPath,
     },
     Frontmatter {
         #[command(subcommand)]
@@ -97,28 +93,19 @@ fn main() {
     let ast = comrak::parse_document(&arena, &file, &mdparser::utils::default_options());
 
     let result = match cli.command {
-        Commands::Links {
-            list,
-            root,
-            replace_url,
-        } => {
+        Commands::Links { list, replace_url } => {
             let list = if replace_url.len() == 0 && !list {
                 true
             } else {
                 list
             };
 
-            replace_url.chunks(2).for_each(|p| {
-                links::iterate_links(ast, |l| {
-                    if l.url == p[0] {
-                        l.url = (*p[1]).to_string()
-                    }
-                })
-            });
+            replace_url
+                .chunks(2)
+                .for_each(|p| links::replace_links(ast, &p[0], &p[1]));
 
             if list {
-                let links = links::get_links(ast);
-                cli::ResultType::List(links)
+                cli::ResultType::List(links::get_links(ast))
             } else {
                 let mut str = vec![];
                 match comrak::format_commonmark(ast, &utils::default_options(), &mut str) {
