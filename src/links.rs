@@ -1,8 +1,11 @@
+use std::borrow::{Borrow, BorrowMut};
 use std::{cell::RefCell, collections::HashMap};
 use std::{fs, io, path::PathBuf};
 
 use comrak::nodes::{Ast, NodeLink, NodeValue};
 use comrak::{arena_tree::Node, Arena};
+
+use crate::utils;
 
 pub struct ParseOptions {
     pub alias_prop: Option<String>,
@@ -21,6 +24,30 @@ impl Default for ParseOptions {
             remove_unfound: true,
         }
     }
+}
+
+pub fn iterate_links<'a, F>(ast: &'a Node<'a, RefCell<Ast>>, iterator: F)
+where
+    F: Fn(&mut NodeLink),
+{
+    let _ = utils::iter_nodes(ast, &|node| {
+        if let NodeValue::Link(ref mut l) = &mut node.data.borrow_mut().value {
+            iterator(l);
+        };
+        Ok::<(), ()>(())
+    });
+}
+
+pub fn get_links<'a>(ast: &'a Node<'a, RefCell<Ast>>) -> Vec<String> {
+    let links: RefCell<Vec<String>> = RefCell::new(vec![]);
+    let _ = utils::iter_nodes(ast, &|node| {
+        if let NodeValue::Link(l) = &node.data.borrow().value {
+            links.borrow_mut().push(l.url.clone());
+        }
+        Ok::<(), ()>(())
+    });
+    let r = links.borrow().to_vec();
+    r
 }
 
 #[derive(Debug)]
