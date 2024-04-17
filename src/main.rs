@@ -131,37 +131,38 @@ fn main() {
     }
 
     if let cli::ResultType::Err(e) = result {
-        cli::print_error(e);
-        panic!()
+        cli::print_error(e, cli.surpress_errors);
+        return;
     }
 
     let str = match cli::result_to_str(result, &cli.list_format) {
         Ok(s) => s,
         Err(e) => {
-            cli::print_error(e);
-            panic!();
+            cli::print_error(e, cli.surpress_errors);
+            return;
         }
     };
 
     match cli.output.write(str.as_bytes()) {
         Ok(_) => (),
         Err(e) => {
-            cli::print_error(cli::Error {
-                code: cli::ErrorCode::EIOWR,
-                description: format!("Error trying to write result to output's writer\n{e:#?}"),
-                fix: Some(String::from(
-                    "Try to check if you have write permission to output file",
-                )),
-                url: None,
-            });
-            panic!();
+            cli::print_error(
+                cli::Error {
+                    code: cli::ErrorCode::EIOWR,
+                    description: format!("Error trying to write result to output's writer\n{e:#?}"),
+                    fix: Some(String::from(
+                        "Try to check if you have write permission to output file",
+                    )),
+                    url: None,
+                },
+                cli.surpress_errors,
+            );
         }
     }
-
-    // println!("{ast:#?}");
 }
 
 mod cli {
+    use core::panic;
     use std::fmt;
 
     #[derive(Clone, Debug, clap::ValueEnum)]
@@ -282,7 +283,10 @@ mod cli {
         }
     }
 
-    pub fn print_error(err: Error) {
-        eprintln!("{}", err)
+    pub fn print_error(err: Error, panics: bool) {
+        eprintln!("{}", err);
+        if panics {
+            panic!();
+        }
     }
 }
