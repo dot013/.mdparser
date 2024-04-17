@@ -76,7 +76,23 @@ enum FrontmatterCommands {
 fn main() {
     let mut cli = Cli::parse();
 
-    let file = std::io::read_to_string(&mut cli.input).unwrap_or_else(|err| panic!("{err:#?}"));
+    let file = match std::io::read_to_string(&mut cli.input) {
+        Ok(s) => s,
+        Err(e) => {
+            cli::print_error(
+                cli::Error {
+                    code: cli::ErrorCode::EIORD,
+                    description: format!("Failed to read input\n{e:#?}"),
+                    fix: Some(String::from(
+                        "Try to check if you have input permission to input file",
+                    )),
+                    url: None,
+                },
+                cli.surpress_errors,
+            );
+            return ();
+        }
+    };
     let arena = comrak::Arena::new();
     let ast = comrak::parse_document(&arena, &file, &mdparser::utils::default_options());
 
@@ -177,6 +193,7 @@ mod cli {
     #[derive(Debug)]
     pub enum ErrorCode {
         EPRSG,
+        EIORD,
         EIOWR,
     }
     impl fmt::Display for ErrorCode {
@@ -196,6 +213,7 @@ mod cli {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let title = match self.code {
                 ErrorCode::EPRSG => "Parsing error",
+                ErrorCode::EIORD => "IO error on read operation",
                 ErrorCode::EIOWR => "IO error on write operation",
             };
 
