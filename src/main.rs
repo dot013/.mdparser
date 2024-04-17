@@ -86,8 +86,6 @@ fn main() {
             root,
             replace_url,
         } => {
-            println!("{list:#?} {root:#?} {replace_url:#?}");
-
             let list = if replace_url.len() == 0 && !list {
                 true
             } else {
