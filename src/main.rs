@@ -132,6 +132,11 @@ fn main() {
         }
     }
 
+    if let cli::ResultType::Err(e) = result {
+        cli::print_error(e);
+        panic!()
+    }
+
     let str = match cli::result_to_str(result, &cli.list_format) {
         Ok(s) => s,
         Err(e) => {
@@ -143,7 +148,15 @@ fn main() {
     match cli.output.write(str.as_bytes()) {
         Ok(_) => (),
         Err(e) => {
-            panic!("{e:#?}");
+            cli::print_error(cli::Error {
+                code: cli::ErrorCode::EIOWR,
+                description: format!("Error trying to write result to output's writer\n{e:#?}"),
+                fix: Some(String::from(
+                    "Try to check if you have write permission to output file",
+                )),
+                url: None,
+            });
+            panic!();
         }
     }
 
@@ -165,6 +178,7 @@ mod cli {
     #[derive(Debug)]
     pub enum ErrorCode {
         EPRSG,
+        EIOWR,
     }
     impl fmt::Display for ErrorCode {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -183,6 +197,7 @@ mod cli {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let title = match self.code {
                 ErrorCode::EPRSG => "Parsing error",
+                ErrorCode::EIOWR => "IO error on write operation",
             };
 
             let fix = if let Some(fix) = &self.fix {
