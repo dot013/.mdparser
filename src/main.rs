@@ -1,4 +1,7 @@
+use std::borrow::Borrow;
+use std::fs::File;
 use std::io::Write;
+use std::path::PathBuf;
 
 use clap::{ArgAction, Parser, Subcommand};
 use clio::{Input, Output};
@@ -13,14 +16,14 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    #[arg(long, global = true, default_value = "lines")]
-    list_format: cli::ListFormat,
-
-    #[arg(short, long, global = true, default_value = "-")]
+    #[arg(global = true, default_value = "-")]
     input: Input,
 
-    #[arg(short, long, global = true, default_value = "-")]
-    output: Output,
+    #[arg(short, long, global = true, action = ArgAction::SetTrue)]
+    write: bool,
+
+    #[arg(long, global = true, default_value = "lines")]
+    list_format: cli::ListFormat,
 
     #[arg(long)]
     surpress_errors: bool,
@@ -89,6 +92,7 @@ fn main() {
             return ();
         }
     };
+
     let arena = comrak::Arena::new();
     let ast = comrak::parse_document(&arena, &file, &mdparser::utils::default_options());
 
@@ -128,7 +132,7 @@ fn main() {
     };
 
     if let cli::ListFormat::JSON = &cli.list_format {
-        if cli.output.is_tty() {
+        if cli.input.is_tty() {
             cli.list_format = cli::ListFormat::PrettyJSON
         }
     }
@@ -146,7 +150,63 @@ fn main() {
         }
     };
 
-    match cli.output.write(str.as_bytes()) {
+    if cli.input.is_std() || !cli.write {
+        if let Err(e) = std::io::stdout().write(str.as_bytes()) {
+            cli::print_error(
+                cli::Error {
+                    code: cli::ErrorCode::EIOWR,
+                    description: format!("Error trying to write result to stdout\n{e:#?}"),
+                    fix: None,
+                    url: None,
+                },
+                cli.surpress_errors,
+            );
+        }
+    } else if let Some(f) = cli.input.path().to_str() {
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .read(true)
+            .create(true)
+            .open(PathBuf::from(f));
+
+        match file {
+            Ok(mut f) => {
+                if let Err(e) = f.write(str.as_bytes()) {
+                    cli::print_error(
+                        cli::Error {
+                            code: cli::ErrorCode::EIOWR,
+                            description: format!("Error, failed to write to file\n{e:#?}"),
+                            fix: None,
+                            url: None,
+                        },
+                        cli.surpress_errors,
+                    );
+                }
+            }
+            Err(e) => cli::print_error(
+                cli::Error {
+                    code: cli::ErrorCode::EIORD,
+                    description: format!("Error, failed to open input's file\n{e:#?}"),
+                    fix: None,
+                    url: None,
+                },
+                cli.surpress_errors,
+            ),
+        }
+    } else {
+        cli::print_error(
+            cli::Error {
+                code: cli::ErrorCode::EIOTY,
+                description: format!("Error, output is not a valid file"),
+                fix: None,
+                url: None,
+            },
+            cli.surpress_errors,
+        );
+    }
+
+    /*
+    match cli.input.write(str.as_bytes()) {
         Ok(_) => (),
         Err(e) => {
             cli::print_error(
@@ -162,6 +222,7 @@ fn main() {
             );
         }
     }
+    */
 }
 
 mod cli {
@@ -182,6 +243,7 @@ mod cli {
         EPRSG,
         EIORD,
         EIOWR,
+        EIOTY,
     }
     impl fmt::Display for ErrorCode {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -190,6 +252,7 @@ mod cli {
         }
     }
 
+    #[derive(Debug)]
     pub struct Error {
         pub description: String,
         pub code: ErrorCode,
@@ -202,6 +265,7 @@ mod cli {
                 ErrorCode::EPRSG => "Parsing error",
                 ErrorCode::EIORD => "IO error on read operation",
                 ErrorCode::EIOWR => "IO error on write operation",
+                ErrorCode::EIOTY => "IO error on input/output type",
             };
 
             let fix = if let Some(fix) = &self.fix {
@@ -224,6 +288,7 @@ mod cli {
         }
     }
 
+    #[derive(Debug)]
     pub enum ResultType<T>
     where
         T: fmt::Display + fmt::Debug + serde::Serialize,
