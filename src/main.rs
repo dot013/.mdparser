@@ -204,25 +204,6 @@ fn main() {
             cli.surpress_errors,
         );
     }
-
-    /*
-    match cli.input.write(str.as_bytes()) {
-        Ok(_) => (),
-        Err(e) => {
-            cli::print_error(
-                cli::Error {
-                    code: cli::ErrorCode::EIOWR,
-                    description: format!("Error trying to write result to output's writer\n{e:#?}"),
-                    fix: Some(String::from(
-                        "Try to check if you have write permission to output file",
-                    )),
-                    url: None,
-                },
-                cli.surpress_errors,
-            );
-        }
-    }
-    */
 }
 
 mod cli {
