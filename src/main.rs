@@ -1,12 +1,10 @@
-use std::borrow::Borrow;
-use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
 use clap::{ArgAction, Parser, Subcommand};
-use clio::{Input, Output};
+use clio::Input;
 
-use mdparser::convert;
+use mdparser::frontmatter::Frontmatter;
 use mdparser::links;
 use mdparser::utils;
 
@@ -39,36 +37,14 @@ enum Commands {
         replace_url: Vec<String>,
     },
     Frontmatter {
-        #[command(subcommand)]
-        command: FrontmatterCommands,
-    },
-    Convert {
-        #[arg(short, long)]
-        format: convert::Formats,
-    },
-}
-
-#[derive(Debug, Subcommand)]
-enum FrontmatterCommands {
-    Set {
-        #[clap()]
-        property: String,
-
-        #[clap(num_args(1..))]
-        value: Vec<String>,
-
         #[arg(short, long, action = ArgAction::SetTrue)]
-        json: bool,
-    },
-    Get {
-        #[clap()]
-        property: String,
+        list: bool,
 
-        #[arg(short, long, action = ArgAction::SetTrue)]
-        error_on_unfound: bool,
+        #[arg(short, long, num_args = 2, value_names = ["PROPERTY", "VALUE"], allow_negative_numbers = true)]
+        set_value: Vec<String>,
 
-        #[arg(short, long, action = ArgAction::SetTrue)]
-        stderr_on_unfound: bool,
+        #[arg(short, long, num_args = 2, value_names = ["FROM", "TO"])]
+        rename_prop: Vec<String>,
     },
 }
 
@@ -104,23 +80,54 @@ fn main() {
                 list
             };
 
+            // TODO: Remove clone
             replace_url
                 .chunks(2)
-                .for_each(|p| links::replace_links(ast, &p[0], &p[1]));
+                .for_each(|p| links::replace_links(ast, p[0].clone(), p[1].clone()));
 
             if list {
                 cli::ResultType::List(links::get_links(ast))
             } else {
-                let mut str = vec![];
-                match comrak::format_commonmark(ast, &utils::default_options(), &mut str) {
-                    Ok(_) => cli::ResultType::String(String::from_utf8(str).unwrap()),
-                    Err(e) => cli::ResultType::Err(cli::Error {
-                        code: cli::ErrorCode::EPRSG,
-                        description: format!("Error formatting ast back to markdown\n{e:#?}"),
-                        fix: None,
-                        url: None,
-                    }),
-                }
+                cli::ResultType::Markdown(ast)
+            }
+        }
+        Commands::Frontmatter {
+            list,
+            set_value,
+            rename_prop,
+        } => {
+            let list = if set_value.len() + rename_prop.len() == 0 && !list {
+                true
+            } else {
+                list
+            };
+
+            let mut frontmatter = Frontmatter::try_from(ast).unwrap();
+
+            // I don't care anymore
+            set_value
+                .chunks(2)
+                .map(|c| {
+                    if let Ok(j) = serde_json::from_str::<serde_json::Value>(&c[1]) {
+                        (c[0].clone(), serde_yaml::to_value(j).unwrap())
+                    } else if let Ok(i) = String::from(&c[1]).parse::<f64>() {
+                        (c[0].clone(), serde_yaml::to_value(i).unwrap())
+                    } else {
+                        (c[0].clone(), serde_yaml::to_value(c[1].clone()).unwrap())
+                    }
+                })
+                .for_each(|p| frontmatter.set(&p.0, p.1));
+
+            rename_prop
+                .chunks(2)
+                .for_each(|p| frontmatter.rename_prop(&p[0], &p[1]));
+
+            frontmatter.place_on_ast(ast);
+
+            if list {
+                todo!()
+            } else {
+                cli::ResultType::Markdown(ast)
             }
         }
         _ => cli::ResultType::Err(cli::Error {
@@ -208,7 +215,10 @@ fn main() {
 
 mod cli {
     use core::panic;
-    use std::fmt;
+    use std::{cell::RefCell, fmt};
+
+    use comrak::{arena_tree::Node, nodes::Ast};
+    use mdparser::utils;
 
     #[derive(Clone, Debug, clap::ValueEnum)]
     pub enum ListFormat {
@@ -270,18 +280,14 @@ mod cli {
     }
 
     #[derive(Debug)]
-    pub enum ResultType<T>
+    pub enum ResultType<'a, T>
     where
         T: fmt::Display + fmt::Debug + serde::Serialize,
     {
         List(Vec<T>),
         String(String),
+        Markdown(&'a Node<'a, RefCell<Ast>>),
         Err(Error),
-    }
-
-    #[derive(serde::Serialize)]
-    struct YAMLList<T: fmt::Display + fmt::Debug + serde::Serialize> {
-        list: Vec<T>,
     }
 
     pub fn result_to_str<T: fmt::Display + fmt::Debug + serde::Serialize>(
@@ -330,7 +336,30 @@ mod cli {
                 }),
             },
             ResultType::String(s) => Ok(s),
-            _ => Ok(String::new()),
+            ResultType::Markdown(ast) => {
+                let mut str = vec![];
+                if let Err(e) = comrak::format_commonmark(ast, &utils::default_options(), &mut str)
+                {
+                    return Err(Error {
+                        code: ErrorCode::EPRSG,
+                        description: format!("Error formatting ast back to markdown\n{e:#?}"),
+                        fix: None,
+                        url: None,
+                    });
+                }
+                match String::from_utf8(str) {
+                    Ok(s) => Ok(s),
+                    Err(e) => Err(Error {
+                        code: ErrorCode::EPRSG,
+                        description: format!(
+                            "Error making string from utf8, after markdown formatting\n{e:#?}",
+                        ),
+                        fix: None,
+                        url: None,
+                    }),
+                }
+            }
+            ResultType::Err(e) => Err(e),
         }
     }
 

@@ -9,18 +9,17 @@ pub fn iterate_links<'a, F>(ast: &'a Node<'a, RefCell<Ast>>, iterator: F)
 where
     F: Fn(&mut NodeLink),
 {
-    let _ = utils::iter_nodes(ast, &|node| {
+    utils::iter_nodes(ast, &|node| {
         if let NodeValue::Link(ref mut l) = &mut node.data.borrow_mut().value {
             iterator(l);
         };
-        Ok::<(), ()>(())
     });
 }
 
-pub fn replace_links<'a>(ast: &'a Node<'a, RefCell<Ast>>, from: &'a str, to: &'a str) {
+pub fn replace_links<'a>(ast: &'a Node<'a, RefCell<Ast>>, from: String, to: String) {
     iterate_links(ast, |l| {
         if l.url == from {
-            l.url = String::from(to)
+            l.url = String::from(&to)
         }
     });
 }

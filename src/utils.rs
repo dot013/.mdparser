@@ -14,13 +14,23 @@ pub fn default_options() -> comrak::Options {
     opts
 }
 
-pub fn iter_nodes<'a, F, E>(node: &'a comrak::nodes::AstNode<'a>, f: &F) -> Result<(), E>
+pub fn iter_nodes<'a, F>(node: &'a comrak::nodes::AstNode<'a>, f: &F)
+where
+    F: Fn(&'a comrak::nodes::AstNode<'a>),
+{
+    f(node);
+    for c in node.children() {
+        iter_nodes(c, f)
+    }
+}
+
+pub fn iter_nodes_err<'a, F, E>(node: &'a comrak::nodes::AstNode<'a>, f: &F) -> Result<(), E>
 where
     F: Fn(&'a comrak::nodes::AstNode<'a>) -> Result<(), E>,
 {
     f(node)?;
     for c in node.children() {
-        iter_nodes(c, f)?
+        iter_nodes_err(c, f)?
     }
     Ok(())
 }
@@ -54,11 +64,10 @@ where
 
 pub fn extract_text<'a>(node: &'a comrak::nodes::AstNode<'a>) -> String {
     let text = RefCell::new(String::new());
-    let _ = iter_nodes(node, &|node| {
+    iter_nodes(node, &|node| {
         if let NodeValue::Text(t) = &node.data.borrow().value {
             text.borrow_mut().push_str(&t);
         }
-        Ok::<(), std::fmt::Error>(())
     });
     let r = text.borrow().to_string();
     r

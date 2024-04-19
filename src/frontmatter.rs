@@ -1,82 +1,142 @@
+use std::borrow::{Borrow, BorrowMut};
+use std::cell::RefCell;
+
 use serde_yaml as yaml;
 use std::collections::HashMap;
 
+use comrak::arena_tree::Node;
+use comrak::nodes::{Ast, NodeValue};
+
+use crate::utils;
+
 #[derive(Debug)]
-pub struct Frontmatter<T> {
-    map: HashMap<String, T>,
+pub struct Frontmatter {
+    map: HashMap<String, yaml::Value>,
 }
 
-impl<T> Frontmatter<T>
-where
-    for<'a> T: serde::de::Deserialize<'a> + serde::Serialize,
-{
-    pub fn new(f: &mut String) -> Result<Frontmatter<T>, yaml::Error> {
-        let f = f.split("---").collect::<Vec<&str>>()[1];
-        let m = match yaml::from_str::<HashMap<String, T>>(&f) {
-            Ok(m) => m,
-            Err(e) => return Err(e),
-        };
-        Ok(Frontmatter { map: m })
+impl<'a> Frontmatter {
+    pub fn new() -> Frontmatter {
+        Frontmatter {
+            map: HashMap::new(),
+        }
     }
-    pub fn get(&self, key: &str) -> Option<&T> {
+    pub fn get(&self, key: &str) -> Option<&yaml::Value> {
         self.map.get(key)
     }
-    pub fn set(&mut self, key: &str, value: T) {
+    pub fn set(&mut self, key: &str, value: yaml::Value) {
         self.map.insert(String::from(key), value);
     }
-    pub fn to_string(&self) -> Result<String, yaml::Error> {
-        Ok(format!("---\n{}---\n\n", yaml::to_string(&self.map)?))
+    pub fn rename_prop(&mut self, from: &str, to: &str) {
+        if let Some(value) = self.map.get(from) {
+            self.map.insert(String::from(to), value.clone());
+            self.map.remove(from);
+        }
     }
-    pub fn to_map(&self) -> &HashMap<String, T> {
-        &self.map
+    pub fn place_on_ast(
+        self,
+        ast: &'a Node<'a, RefCell<Ast>>,
+    ) -> RefCell<Result<Option<String>, yaml::Error>> {
+        let result = RefCell::new(Ok(None));
+        utils::iter_nodes(ast, &|node| {
+            if let NodeValue::FrontMatter(ref mut f) = &mut node.data.borrow_mut().value {
+                match String::try_from(&self) {
+                    Ok(s) => {
+                        // I'm sure there's a way to not use clone here, something in the lines
+                        // of passing the pointer of f to the result, and then changing the pointer
+                        // of f to be equals to s. But premature optimisation is the root of all
+                        // evil, and this is a not a "serious" project. When I better learn Rust,
+                        // I hopefully learn how to do this.
+                        //
+                        // - Gustavo "Guz" L. de Mello (2024-04-18)
+                        *result.borrow_mut() = Ok(Some(f.clone()));
+                        f.replace_range(.., &s);
+                    }
+                    Err(e) => {
+                        *result.borrow_mut() = Err(e);
+                    }
+                };
+            }
+        });
+        result
     }
 }
 
-pub fn to_yaml_value<T>(value: Vec<T>, json_to_string: bool) -> yaml::Value
-where
-    T: ToString + std::fmt::Display,
-{
-    if value.len() >= 2 {
-        yaml::Value::Sequence(
+impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for Frontmatter {
+    type Error = yaml::Error;
+    fn try_from(value: &'a Node<'a, RefCell<Ast>>) -> Result<Self, Self::Error> {
+        let str = RefCell::new(String::new());
+        utils::iter_nodes(value, &|node| {
+            if let NodeValue::FrontMatter(f) = &node.data.borrow_mut().value {
+                *str.borrow_mut() = f.to_string();
+            };
+        });
+        let s = str.borrow().clone();
+        Frontmatter::try_from(s)
+    }
+}
+
+impl TryFrom<&str> for Frontmatter {
+    type Error = yaml::Error;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let value = if value.trim().starts_with("---") {
+            value.split("---").collect::<Vec<&str>>()[1]
+        } else {
             value
-                .iter()
-                // This causes a recursion limit, which I'm not caring on fixing
-                // for now knowing the scope of this project as a hole.
-                // .map(|v| to_yaml_value(vec![v; 1], json_to_string))
-                .map(|v| yaml::Value::String(v.to_string()))
-                .collect::<Vec<yaml::Value>>(),
-        );
+        };
+        Ok(Frontmatter {
+            map: yaml::from_str::<HashMap<String, yaml::Value>>(&value)?,
+        })
     }
+}
 
-    let value = &value[0].to_string();
+impl TryFrom<String> for Frontmatter {
+    type Error = yaml::Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Frontmatter::try_from(value.as_str())
+    }
+}
 
-    match value.to_lowercase().as_str() {
-        "null" | "~" => return yaml::Value::Null,
-        "true" | "yes" => return yaml::Value::Bool(true),
-        "false" | "no" => return yaml::Value::Bool(false),
-        _ => (),
+impl TryFrom<&String> for Frontmatter {
+    type Error = yaml::Error;
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
+        Frontmatter::try_from(value.as_str())
     }
+}
 
-    if let Ok(v) = value.parse::<u64>() {
-        return yaml::Value::Number(v.into());
+impl AsRef<Frontmatter> for Frontmatter {
+    fn as_ref(&self) -> &Frontmatter {
+        self
     }
-    if let Ok(v) = value.parse::<i64>() {
-        return yaml::Value::Number(v.into());
-    }
-    if let Ok(v) = value.parse::<f64>() {
-        return yaml::Value::Number(v.into());
-    }
+}
 
-    match yaml::from_str::<serde_yaml::Value>(value) {
-        Ok(v) => {
-            if json_to_string {
-                return yaml::Value::String(String::from(value));
-            } else {
-                return v;
-            }
-        }
-        Err(_) => (),
+impl AsMut<Frontmatter> for Frontmatter {
+    fn as_mut(&mut self) -> &mut Frontmatter {
+        self
     }
+}
 
-    yaml::Value::String(String::from(value))
+impl TryFrom<Frontmatter> for String {
+    type Error = yaml::Error;
+    fn try_from(value: Frontmatter) -> Result<Self, Self::Error> {
+        String::try_from(&value)
+    }
+}
+
+impl TryFrom<&Frontmatter> for String {
+    type Error = yaml::Error;
+    fn try_from(value: &Frontmatter) -> Result<Self, Self::Error> {
+        Ok(format!("---\n{}---\n\n", yaml::to_string(&value.map)?))
+    }
+}
+
+impl From<Frontmatter> for HashMap<String, yaml::Value> {
+    fn from(value: Frontmatter) -> Self {
+        value.map
+    }
+}
+
+impl From<&Frontmatter> for HashMap<String, yaml::Value> {
+    fn from(value: &Frontmatter) -> Self {
+        value.map.clone()
+    }
 }
