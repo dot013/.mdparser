@@ -35,12 +35,6 @@ pub mod blocks {
         UnordoredListItem,
     }
 
-    trait BlockType: Default {
-        fn new() -> Self {
-            Self::default()
-        }
-    }
-
     #[serde_with::skip_serializing_none]
     #[derive(Debug, Deserialize, Serialize)]
     pub struct BlockText {
@@ -50,7 +44,10 @@ pub mod blocks {
         pub formatting: Option<Vec<super::text_formatting::FormatValue>>,
         pub ident_level: Option<u8>,
     }
-    impl Default for BlockText {
+    impl BlockText {
+        pub fn new(value: &str) -> Self {
+            Self::from(value)
+        }
         fn default() -> Self {
             Self {
                 r#type: String::from("text"),
@@ -77,7 +74,6 @@ pub mod blocks {
             }
         }
     }
-    impl BlockType for BlockText {}
 
     #[serde_with::skip_serializing_none]
     #[derive(Debug, Deserialize, Serialize)]
@@ -91,7 +87,10 @@ pub mod blocks {
         pub alt_text: Option<String>,
         pub caption: Option<String>,
     }
-    impl Default for BlockImage {
+    impl BlockImage {
+        pub fn new(media: Vec<objects::Media>) -> Self {
+            Self::from(media)
+        }
         fn default() -> Self {
             Self {
                 r#type: String::from("image"),
@@ -118,7 +117,6 @@ pub mod blocks {
             Self::from(vec![value])
         }
     }
-    impl BlockType for BlockImage {}
 
     #[serde_with::skip_serializing_none]
     #[derive(Debug, Deserialize, Serialize)]
@@ -132,7 +130,10 @@ pub mod blocks {
         pub display_url: Option<url::Url>,
         pub poster: Option<objects::Media>,
     }
-    impl Default for BlockLink {
+    impl BlockLink {
+        pub fn new(url: url::Url) -> Self {
+            Self::from(url)
+        }
         fn default() -> Self {
             Self {
                 r#type: String::from("link"),
@@ -154,7 +155,6 @@ pub mod blocks {
             }
         }
     }
-    impl BlockType for BlockLink {}
 
     #[serde_with::skip_serializing_none]
     #[derive(Debug, Deserialize, Serialize)]
@@ -173,6 +173,9 @@ pub mod blocks {
         pub attribution: Option<attributions::AttributionValue>,
     }
     impl BlockAudio {
+        pub fn new(url: url::Url) -> Self {
+            Self::from(url)
+        }
         pub fn is_valid(&self) -> bool {
             if self.url.is_some() || self.media.is_some() {
                 true
@@ -180,8 +183,6 @@ pub mod blocks {
                 false
             }
         }
-    }
-    impl Default for BlockAudio {
         fn default() -> Self {
             Self {
                 r#type: String::from("audio"),
@@ -215,7 +216,6 @@ pub mod blocks {
             }
         }
     }
-    impl BlockType for BlockAudio {}
 
     #[serde_with::skip_serializing_none]
     #[derive(Debug, Deserialize, Serialize)]
@@ -233,6 +233,9 @@ pub mod blocks {
         pub can_autoplay_on_cellular: Option<bool>,
     }
     impl BlockVideo {
+        pub fn new(url: url::Url) -> Self {
+            Self::from(url)
+        }
         pub fn is_valid(&self) -> bool {
             if self.url.is_some() || self.media.is_some() {
                 true
@@ -240,8 +243,6 @@ pub mod blocks {
                 false
             }
         }
-    }
-    impl Default for BlockVideo {
         fn default() -> Self {
             Self {
                 r#type: String::from("audio"),
@@ -274,7 +275,6 @@ pub mod blocks {
             }
         }
     }
-    impl BlockType for BlockVideo {}
 }
 
 pub mod text_formatting {
@@ -296,12 +296,8 @@ pub mod text_formatting {
         Color(FormatTypeColor),
     }
 
-    // TODO: Make default() be private, removing the Default implementation
-    //       since private implementations does't appear outside the module
-    trait FormatType: Default + From<Range<u64>> + From<String> {
-        fn new() -> Self {
-            Self::default()
-        }
+    trait FormatType: From<Range<u64>> + From<String> {
+        fn default() -> Self;
     }
 
     #[derive(Debug, Deserialize, Serialize)]
@@ -311,7 +307,15 @@ pub mod text_formatting {
         pub end: u64,
         pub url: url::Url,
     }
-    impl Default for FormatTypeLink {
+    impl FormatTypeLink {
+        pub fn new(range: Range<u64>, url: url::Url) -> Self {
+            Self {
+                url,
+                ..Self::from(range)
+            }
+        }
+    }
+    impl FormatType for FormatTypeLink {
         fn default() -> Self {
             Self {
                 r#type: String::from("link"),
@@ -329,13 +333,21 @@ pub mod text_formatting {
         pub end: u64,
         pub blog: objects::BlogInfo,
     }
-    impl Default for FormatTypeMention {
+    impl FormatTypeMention {
+        pub fn new(range: Range<u64>, blog: objects::BlogInfo) -> Self {
+            Self {
+                blog,
+                ..Self::from(range)
+            }
+        }
+    }
+    impl FormatType for FormatTypeMention {
         fn default() -> Self {
             Self {
                 r#type: String::from("mention"),
                 start: 0,
                 end: 0,
-                blog: objects::BlogInfo::default(),
+                blog: objects::BlogInfo::new("t:0"),
             }
         }
     }
@@ -347,7 +359,15 @@ pub mod text_formatting {
         pub end: u64,
         pub hex: String,
     }
-    impl Default for FormatTypeColor {
+    impl FormatTypeColor {
+        pub fn new(range: Range<u64>, hex: color_art::Color) -> Self {
+            Self {
+                hex: hex.hex(),
+                ..Self::from(range)
+            }
+        }
+    }
+    impl FormatType for FormatTypeColor {
         fn default() -> Self {
             Self {
                 r#type: String::from("link"),
@@ -389,7 +409,6 @@ pub mod text_formatting {
                     }
                 }
             })*
-            $(impl FormatType for $t {})*
         };
         // Defines the struct and implements Default trait if the token is an
         // identifier and a literal
@@ -400,7 +419,7 @@ pub mod text_formatting {
                 pub start: u64,
                 pub end: u64,
             })*
-            $(impl Default for $t {
+            $(impl FormatType for $t {
                 fn default() -> Self {
                     Self {
                         r#type: String::from($s),
@@ -439,8 +458,11 @@ pub mod objects {
         pub fn new(uuid: &str) -> Self {
             Self::from(uuid)
         }
-    }
-    impl Default for BlogInfo {
+        pub fn is_valid(&self) -> bool {
+            !self.uuid.is_empty()
+                || !self.uuid.chars().count() == 22
+                || !self.uuid.starts_with("t:")
+        }
         fn default() -> Self {
             Self {
                 uuid: String::new(),
@@ -490,10 +512,15 @@ pub mod objects {
     }
     impl From<u64> for Post {
         fn from(value: u64) -> Self {
-            Self { id: value }
+            Self {
+                id: value,
+                id_string: value.to_string(),
+                ..Self::default()
+            }
         }
     }
 
+    #[serde_with::skip_serializing_none]
     #[derive(Debug, Deserialize, Serialize)]
     pub struct Media {
         pub r#type: Option<String>,
@@ -503,6 +530,30 @@ pub mod objects {
         pub original_dimensions_missing: Option<bool>,
         pub cropped: Option<bool>,
         pub has_original_dimentions: Option<bool>,
+    }
+    impl Media {
+        pub fn new(url: url::Url) -> Self {
+            Self::from(url)
+        }
+        fn default() -> Self {
+            Self {
+                r#type: None,
+                url: url::Url::parse("https://tumblr.com").unwrap(),
+                width: None,
+                height: None,
+                original_dimensions_missing: None,
+                cropped: None,
+                has_original_dimentions: None,
+            }
+        }
+    }
+    impl From<url::Url> for Media {
+        fn from(value: url::Url) -> Self {
+            Self {
+                url: value,
+                ..Self::default()
+            }
+        }
     }
 
     #[derive(Debug, Deserialize, Serialize)]
@@ -528,12 +579,6 @@ pub mod attributions {
         Blog(AttributionBlog),
     }
 
-    trait AttributionType: Default {
-        fn new() -> Self {
-            Self::default()
-        }
-    }
-
     #[derive(Debug, Deserialize, Serialize)]
     pub struct AttributionPost {
         r#type: String,
@@ -541,7 +586,18 @@ pub mod attributions {
         pub post: objects::Post,
         pub blog: objects::BlogInfo,
     }
-    impl Default for AttributionPost {
+    impl AttributionPost {
+        pub fn new(url: url::Url, post: objects::Post, blog: objects::BlogInfo) -> Self {
+            Self {
+                url,
+                post,
+                blog,
+                ..Self::default()
+            }
+        }
+        pub fn is_valid(&self) -> bool {
+            self.blog.is_valid() && self.post.is_valid()
+        }
         fn default() -> Self {
             Self {
                 r#type: String::from("post"),
@@ -551,14 +607,16 @@ pub mod attributions {
             }
         }
     }
-    impl AttributionType for AttributionPost {}
 
     #[derive(Debug, Deserialize, Serialize)]
     pub struct AttributionLink {
         r#type: String,
         pub url: url::Url,
     }
-    impl Default for AttributionLink {
+    impl AttributionLink {
+        pub fn new(url: url::Url) -> Self {
+            Self::from(url)
+        }
         fn default() -> Self {
             Self {
                 r#type: String::from("link"),
@@ -566,7 +624,14 @@ pub mod attributions {
             }
         }
     }
-    impl AttributionType for AttributionLink {}
+    impl From<url::Url> for AttributionLink {
+        fn from(value: url::Url) -> Self {
+            Self {
+                url: value,
+                ..Self::default()
+            }
+        }
+    }
 
     #[derive(Debug, Deserialize, Serialize)]
     pub struct AttributionBlog {
@@ -574,7 +639,13 @@ pub mod attributions {
         pub url: Option<url::Url>,
         pub blog: objects::BlogInfo,
     }
-    impl Default for AttributionBlog {
+    impl AttributionBlog {
+        pub fn new(blog: objects::BlogInfo) -> Self {
+            Self::from(blog)
+        }
+        pub fn is_valid(&self) -> bool {
+            self.blog.is_valid()
+        }
         fn default() -> Self {
             Self {
                 r#type: String::from("blog"),
@@ -583,7 +654,21 @@ pub mod attributions {
             }
         }
     }
-    impl AttributionType for AttributionBlog {}
+    impl From<objects::BlogInfo> for AttributionBlog {
+        fn from(value: objects::BlogInfo) -> Self {
+            Self {
+                blog: value,
+                ..Self::default()
+            }
+        }
+    }
+    /* TODO: Add TryFrom which checks if given BlogInfo is valid
+    impl TryFrom<objects::BlogInfo> for AttributionBlog {
+        fn try_from(value: objects::BlogInfo) -> Result<Self, Self::Error> {
+            todo!()
+        }
+    }
+    */
 
     #[derive(Debug, Deserialize, Serialize)]
     pub struct AttributionApp {
@@ -593,7 +678,10 @@ pub mod attributions {
         pub display_text: Option<String>,
         pub logo: Option<objects::Media>,
     }
-    impl Default for AttributionApp {
+    impl AttributionApp {
+        pub fn new(url: url::Url) -> Self {
+            Self::from(url)
+        }
         fn default() -> Self {
             Self {
                 r#type: String::from("blog"),
@@ -604,5 +692,12 @@ pub mod attributions {
             }
         }
     }
-    impl AttributionType for AttributionApp {}
+    impl From<url::Url> for AttributionApp {
+        fn from(value: url::Url) -> Self {
+            Self {
+                url: value,
+                ..Self::default()
+            }
+        }
+    }
 }
