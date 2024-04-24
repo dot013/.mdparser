@@ -35,7 +35,19 @@ where
     Ok(())
 }
 
-pub fn iter_nodes_shallow<'a, F, E>(node: &'a comrak::nodes::AstNode<'a>, f: &F) -> Result<(), E>
+pub fn iter_nodes_shallow<'a, F>(node: &'a comrak::nodes::AstNode<'a>, f: &F)
+where
+    F: Fn(&'a comrak::nodes::AstNode<'a>),
+{
+    for c in node.children() {
+        f(c)
+    }
+}
+
+pub fn iter_nodes_shallow_err<'a, F, E>(
+    node: &'a comrak::nodes::AstNode<'a>,
+    f: &F,
+) -> Result<(), E>
 where
     F: Fn(&'a comrak::nodes::AstNode<'a>) -> Result<(), E>,
 {
