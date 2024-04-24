@@ -14,6 +14,7 @@ pub mod layout_blocks;
 pub mod objects;
 pub mod text_formatting;
 
+mod objects_post;
 use content_blocks::{BlockText, BlockValue};
 use text_formatting::{FormatTypeBold, FormatTypeItalic, FormatValue};
 
