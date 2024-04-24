@@ -1,4 +1,8 @@
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+
+use super::content_blocks::{BlockText, BlockValue};
+
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Post {
@@ -55,6 +59,37 @@ impl Post {
         } else {
             false
         }
+    }
+    pub fn fold_content(mut self) -> Self {
+        // TODO: Some form of folding also the layout of the npf
+        let groups = self.content.iter_mut().group_by(|c| c.get_type() == "text");
+        self.content = groups
+            .into_iter()
+            .map(|a| {
+                if a.0 == true {
+                    vec![BlockValue::Text(
+                        a.1.fold(BlockText::new(&String::new()), fold_text_block),
+                    )]
+                } else {
+                    a.1.map(|c| c.to_owned()).collect::<Vec<_>>()
+                }
+            })
+            .flatten()
+            .map(|mut a| {
+                if let BlockValue::Text(ref mut t) = a {
+                    t.text = String::from(t.text.trim());
+                }
+                a
+            })
+            .collect::<Vec<_>>();
+        self
+    }
+    pub fn for_each_content<F>(mut self, f: F) -> Self
+    where
+        F: Fn(&mut BlockValue),
+    {
+        self.content.iter_mut().for_each(f);
+        self
     }
     fn default() -> Self {
         Self {
@@ -114,3 +149,22 @@ impl From<u64> for Post {
     }
 }
 
+fn fold_text_block(mut acc: BlockText, c: &mut BlockValue) -> BlockText {
+    if let BlockValue::Text(t) = c {
+        let text = &t.text.trim();
+
+        if let Some(ref mut f) = &mut t.formatting {
+            let offset = acc.text.chars().count() as u64;
+            f.iter_mut().for_each(|f| f.offset(offset));
+
+            if let Some(ref mut af) = acc.formatting {
+                af.append(f);
+            } else {
+                acc.formatting = Some(f.to_vec());
+            }
+        }
+
+        acc.text.push_str(&format!("{} ", text));
+    }
+    acc
+}

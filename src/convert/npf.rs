@@ -1,6 +1,7 @@
 use std::{
     borrow::{Borrow, BorrowMut},
     cell::RefCell,
+    collections::VecDeque,
 };
 
 use comrak::{
@@ -15,8 +16,11 @@ pub mod objects;
 pub mod text_formatting;
 
 mod objects_post;
+
 use content_blocks::{BlockText, BlockValue};
 use text_formatting::{FormatTypeBold, FormatTypeItalic, FormatValue};
+
+use self::content_blocks::BlockImage;
 
 #[derive(Debug)]
 pub enum NPFConvertError {
@@ -55,72 +59,41 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                     Ok(())
                 }
                 NodeValue::Strong => {
-                    let mut content = Self::try_from(n)?.content;
-                    let mut res = content.iter_mut().fold(
-                        BlockText::new(&String::new()),
-                        |mut acc, c| match c {
-                            BlockValue::Text(t) => {
-                                let text = &t.text.trim();
-                                if let Some(ref mut f) = &mut t.formatting {
-                                    let offset = acc.text.chars().count() as u64;
-                                    f.iter_mut().for_each(|f| {
-                                        f.offset(offset);
-                                    });
-                                    if let Some(ref mut af) = acc.formatting {
-                                        af.append(f);
-                                    } else {
-                                        acc.formatting = Some(f.to_vec());
-                                    }
+                    let mut content = Self::try_from(n)?
+                        .fold_content()
+                        .for_each_content(|c| {
+                            if let BlockValue::Text(ref mut t) = c {
+                                let format = FormatValue::Bold(FormatTypeBold::from(&t.text));
+                                if let Some(ref mut f) = t.formatting {
+                                    f.push(format);
+                                } else {
+                                    t.formatting = Some(vec![format]);
                                 }
-                                acc.text.push_str(&format!("{} ", text));
-                                acc
+                                t.text = String::from(t.text.trim());
                             }
-                            _ => acc,
-                        },
-                    );
-                    res.text = res.text.trim().to_string();
-                    let format = FormatValue::Bold(FormatTypeBold::from(&res.text));
-                    if let Some(ref mut f) = res.formatting {
-                        f.push(format);
-                    } else {
-                        res.formatting = Some(vec![format]);
-                    }
-                    post.content.push(BlockValue::Text(res));
+                        })
+                        .content;
+                    post.content.append(&mut content);
                     Ok(())
                 }
                 NodeValue::Emph => {
-                    let mut content = Self::try_from(n)?.content;
-                    let mut res = content.iter_mut().fold(
-                        BlockText::new(&String::new()),
-                        |mut acc, c| match c {
-                            BlockValue::Text(t) => {
-                                let text = &t.text.trim();
-                                if let Some(ref mut f) = &mut t.formatting {
-                                    let offset = acc.text.chars().count() as u64;
-                                    f.iter_mut().for_each(|f| {
-                                        f.offset(offset);
-                                    });
-                                    if let Some(ref mut af) = acc.formatting {
-                                        af.append(f);
-                                    } else {
-                                        acc.formatting = Some(f.to_vec());
-                                    }
+                    let mut content = Self::try_from(n)?
+                        .fold_content()
+                        .for_each_content(|c| {
+                            if let BlockValue::Text(ref mut t) = c {
+                                let format = FormatValue::Italic(FormatTypeItalic::from(&t.text));
+                                if let Some(ref mut f) = t.formatting {
+                                    f.push(format);
+                                } else {
+                                    t.formatting = Some(vec![format]);
                                 }
-                                acc.text.push_str(&format!("{} ", text));
-                                acc
+                                t.text = String::from(t.text.trim());
                             }
-                            _ => acc,
-                        },
-                    );
-                    res.text = res.text.trim().to_string();
-                    let format = FormatValue::Italic(FormatTypeItalic::from(&res.text));
-                    if let Some(ref mut f) = res.formatting {
-                        f.push(format);
-                    } else {
-                        res.formatting = Some(vec![format]);
-                    }
-                    // println!("italic {:#?}", res);
-                    post.content.push(BlockValue::Text(res));
+                        })
+                        .content;
+                    post.content.append(&mut content);
+                    // println!("{:#?}", post);
+
                     Ok(())
                 }
                 _ => Ok(()),
@@ -129,7 +102,7 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
         if let Err(e) = r {
             Err(e)
         } else {
-            // println!("{:#?}", post);
+            println!("{:#?}", post);
             Ok(post)
         }
     }
