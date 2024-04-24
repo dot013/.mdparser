@@ -64,11 +64,7 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                         .for_each_content(|c| {
                             if let BlockValue::Text(ref mut t) = c {
                                 let format = FormatValue::Bold(FormatTypeBold::from(&t.text));
-                                if let Some(ref mut f) = t.formatting {
-                                    f.push(format);
-                                } else {
-                                    t.formatting = Some(vec![format]);
-                                }
+                                t.push_formatting(format);
                                 t.text = String::from(t.text.trim());
                             }
                         })
@@ -82,11 +78,7 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                         .for_each_content(|c| {
                             if let BlockValue::Text(ref mut t) = c {
                                 let format = FormatValue::Italic(FormatTypeItalic::from(&t.text));
-                                if let Some(ref mut f) = t.formatting {
-                                    f.push(format);
-                                } else {
-                                    t.formatting = Some(vec![format]);
-                                }
+                                t.push_formatting(format);
                                 t.text = String::from(t.text.trim());
                             }
                         })

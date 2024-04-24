@@ -2,7 +2,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
-use super::{attributions, objects};
+use super::{attributions, objects, text_formatting::FormatValue};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(untagged)]
@@ -44,12 +44,19 @@ pub struct BlockText {
     r#type: String,
     pub subtype: Option<BlockTextSubtype>,
     pub text: String,
-    pub formatting: Option<Vec<super::text_formatting::FormatValue>>,
+    pub formatting: Option<Vec<FormatValue>>,
     pub ident_level: Option<u8>,
 }
 impl BlockText {
     pub fn new(value: &str) -> Self {
         Self::from(value)
+    }
+    pub fn push_formatting(&mut self, format: FormatValue) {
+        if let Some(ref mut f) = self.formatting {
+            f.push(format);
+        } else {
+            self.formatting = Some(vec![format]);
+        }
     }
     fn default() -> Self {
         Self {
