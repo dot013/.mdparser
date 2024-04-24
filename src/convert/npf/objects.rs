@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct BlogInfo {
     pub uuid: String,
     pub name: Option<String>,
@@ -48,14 +48,14 @@ impl From<url::Url> for BlogInfo {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ReblogTrailPost {
     pub id: String,
     pub timestamp: Option<String>,
     pub is_commercial: Option<bool>,
 }
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ReblogTrail {
     pub post: Option<ReblogTrailPost>,
     pub blog: Option<BlogInfo>,
@@ -65,7 +65,7 @@ pub struct ReblogTrail {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Avatar {
     pub width: u64,
     pub height: u64,
@@ -74,7 +74,7 @@ pub struct Avatar {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Post {
     object_type: String,
     pub id: u64,
@@ -188,7 +188,7 @@ impl From<u64> for Post {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Media {
     pub r#type: Option<String>,
     pub url: url::Url,
@@ -223,7 +223,7 @@ impl From<url::Url> for Media {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EmbedIframe {
     pub url: url::Url,
     pub width: u64,

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::objects;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(untagged)]
 pub enum AttributionValue {
     Post(AttributionPost),
@@ -12,7 +12,7 @@ pub enum AttributionValue {
     Blog(AttributionBlog),
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AttributionPost {
     r#type: String,
     pub url: url::Url,
@@ -41,7 +41,7 @@ impl AttributionPost {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AttributionLink {
     r#type: String,
     pub url: url::Url,
@@ -66,7 +66,7 @@ impl From<url::Url> for AttributionLink {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AttributionBlog {
     r#type: String,
     pub url: Option<url::Url>,
@@ -103,7 +103,7 @@ impl TryFrom<objects::BlogInfo> for AttributionBlog {
 }
 */
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AttributionApp {
     r#type: String,
     pub url: url::Url,

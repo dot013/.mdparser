@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::objects;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(untagged)]
 pub enum FormatValue {
     Bold(FormatTypeBold),
@@ -15,12 +15,25 @@ pub enum FormatValue {
     Mention(FormatTypeMention),
     Color(FormatTypeColor),
 }
+impl FormatValue {
+    pub fn offset(&mut self, offset: u64) {
+        match self {
+            FormatValue::Bold(ref mut f) => f.offset(offset),
+            FormatValue::Italic(ref mut f) => f.offset(offset),
+            FormatValue::Link(ref mut f) => f.offset(offset),
+            FormatValue::Small(ref mut f) => f.offset(offset),
+            FormatValue::Color(ref mut f) => f.offset(offset),
+            FormatValue::Mention(ref mut f) => f.offset(offset),
+            FormatValue::StrikeThrough(ref mut f) => f.offset(offset),
+        }
+    }
+}
 
 trait FormatType: From<Range<u64>> + From<String> {
     fn default() -> Self;
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FormatTypeLink {
     r#type: String,
     pub start: u64,
@@ -46,7 +59,7 @@ impl FormatType for FormatTypeLink {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FormatTypeMention {
     r#type: String,
     pub start: u64,
@@ -72,7 +85,7 @@ impl FormatType for FormatTypeMention {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FormatTypeColor {
     r#type: String,
     pub start: u64,
@@ -120,6 +133,15 @@ macro_rules! ImplInlines {
                     }
                 }
             })*
+            $(impl From<&String> for $t {
+                fn from(value: &String) -> Self {
+                    Self {
+                        start: 0,
+                        end: value.chars().count() as u64,
+                        ..Self::default()
+                    }
+                }
+            })*
             $(impl From<&str> for $t {
                 fn from(value: &str) -> Self {
                     Self {
@@ -129,11 +151,17 @@ macro_rules! ImplInlines {
                     }
                 }
             })*
+            $(impl $t {
+                pub fn offset(&mut self, offset: u64) {
+                    self.start += offset;
+                    self.end += offset;
+                }
+            })*
         };
         // Defines the struct and implements Default trait if the token is an
         // identifier and a literal
         (for $($t:ident $s:literal),+) => {
-            $(#[derive(Debug, Deserialize, Serialize)]
+            $(#[derive(Debug, Deserialize, Serialize, Clone)]
             pub struct $t {
                 r#type: String,
                 pub start: u64,

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{attributions, objects};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(untagged)]
 pub enum BlockValue {
     Text(BlockText),
@@ -14,7 +14,7 @@ pub enum BlockValue {
     Video(BlockVideo),
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum BlockTextSubtype {
     Heading1,
@@ -28,7 +28,7 @@ pub enum BlockTextSubtype {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct BlockText {
     r#type: String,
     pub subtype: Option<BlockTextSubtype>,
@@ -68,7 +68,7 @@ impl From<&str> for BlockText {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct BlockImage {
     r#type: String,
     pub media: Vec<objects::Media>,
@@ -111,7 +111,7 @@ impl From<objects::Media> for BlockImage {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct BlockLink {
     r#type: String,
     pub url: url::Url,
@@ -149,7 +149,7 @@ impl From<url::Url> for BlockLink {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct BlockAudio {
     r#type: String,
     pub media: Option<objects::Media>,
@@ -210,7 +210,7 @@ impl From<url::Url> for BlockAudio {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct BlockVideo {
     r#type: String,
     pub url: Option<url::Url>,

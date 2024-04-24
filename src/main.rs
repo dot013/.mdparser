@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use clap::{ArgAction, Parser, Subcommand};
 use clio::Input;
 
+use mdparser::convert;
 use mdparser::frontmatter::Frontmatter;
 use mdparser::links;
 use mdparser::utils;
@@ -71,6 +72,9 @@ fn main() {
 
     let arena = comrak::Arena::new();
     let ast = comrak::parse_document(&arena, &file, &mdparser::utils::default_options());
+
+    let _ = convert::npf::from(ast);
+    // println!("{:#?}", ast);
 
     let result = match cli.command {
         Commands::Links { list, replace_url } => {

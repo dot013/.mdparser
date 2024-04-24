@@ -1,13 +1,13 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(untagged)]
 pub enum BlockValue {
     Rows(BlockRows),
     Ask(BlockAsk),
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct BlockRows {
     r#type: String,
     pub display: Vec<DisplayBlocks>,
@@ -42,7 +42,7 @@ impl From<DisplayBlocks> for BlockRows {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DisplayBlocks {
     pub blocks: Vec<u64>,
     pub mode: Option<String>,
@@ -75,7 +75,7 @@ impl From<u64> for DisplayBlocks {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct BlockAsk {
     r#type: String,
     blocks: Vec<u64>,
