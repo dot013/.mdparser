@@ -120,6 +120,12 @@ check_prefix() {
 
 		scope="${scope/!}"
 		scope="${scope/\)}"
+
+		if check_casing "$scope"; then
+			false
+		else
+			panic "[optional scope] \"$scope\" is not in correct casing ($(get_casing))";
+		fi
 	fi
 
 	if check_casing "$type"; then
@@ -128,11 +134,6 @@ check_prefix() {
 		panic "<prefix> \"$type\" is not in correct casing ($(get_casing))";
 	fi
 
-	if check_casing "$scope"; then
-		false
-	else
-		panic "[optional scope] \"$scope\" is not in correct casing ($(get_casing))";
-	fi
 
 	echo "$type $scope"
 }
