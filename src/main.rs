@@ -73,7 +73,10 @@ fn main() {
     let arena = comrak::Arena::new();
     let ast = comrak::parse_document(&arena, &file, &mdparser::utils::default_options());
 
-    let _ = convert::npf::from(ast);
+    match convert::npf::from(ast) {
+        Ok(test) => println!("{}", serde_json::to_string_pretty(&test).unwrap()),
+        Err(err) => println!("{err:#?}"),
+    };
     // println!("{:#?}", ast);
 
     let result = match cli.command {

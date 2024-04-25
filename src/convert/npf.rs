@@ -20,12 +20,12 @@ mod objects_post;
 use content_blocks::{BlockText, BlockValue};
 use text_formatting::{FormatTypeBold, FormatTypeItalic, FormatValue};
 
-use self::content_blocks::BlockImage;
 use text_formatting::{FormatTypeLink, FormatTypeStrikeThrough};
 
 #[derive(Debug)]
 pub enum NPFConvertError {
     TODO,
+    InvalidURL { url: String, err: url::ParseError },
 }
 
 fn extract_text(contents: &Vec<BlockValue>) -> String {
@@ -105,13 +105,33 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                     post.content.append(&mut content);
                     Ok(())
                 }
+                NodeValue::Link(link) => match url::Url::parse(&link.url) {
+                    Ok(url) => {
+                        let mut content = Self::try_from(n)?
+                            .fold_content()
+                            .for_each_content(|c| {
+                                if let BlockValue::Text(ref mut t) = c {
+                                    let mut format = FormatTypeLink::from(&t.text);
+                                    format.url = url.clone();
+                                    t.push_formatting(FormatValue::Link(format));
+                                    t.text = String::from(t.text.trim());
+                                }
+                            })
+                            .content;
+                        post.content.append(&mut content);
+                        Ok(())
+                    }
+                    Err(err) => Err(NPFConvertError::InvalidURL {
+                        url: link.url.clone(),
+                        err,
+                    }),
+                },
                 _ => Ok(()),
             })
             .collect();
         if let Err(e) = r {
             Err(e)
         } else {
-            println!("{:#?}", post);
             Ok(post)
         }
     }
