@@ -62,7 +62,10 @@ impl Post {
     }
     pub fn fold_content(mut self) -> Self {
         // TODO: Some form of folding also the layout of the npf
-        let groups = self.content.iter_mut().group_by(|c| c.get_type() == "text");
+        let groups = self.content.iter_mut().group_by(|c| match c {
+            BlockValue::Text(_) => true,
+            _ => false,
+        });
         self.content = groups
             .into_iter()
             .map(|a| {

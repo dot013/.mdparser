@@ -13,17 +13,6 @@ pub enum BlockValue {
     Audio(BlockAudio),
     Video(BlockVideo),
 }
-impl BlockValue {
-    pub fn get_type(&self) -> String {
-        String::from(match &self {
-            BlockValue::Text(_) => "text",
-            BlockValue::Image(_) => "image",
-            BlockValue::Link(_) => "link",
-            BlockValue::Audio(_) => "audio",
-            BlockValue::Video(_) => "video",
-        })
-    }
-}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "snake_case")]
