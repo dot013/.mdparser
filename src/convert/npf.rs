@@ -21,6 +21,7 @@ use content_blocks::{BlockText, BlockValue};
 use text_formatting::{FormatTypeBold, FormatTypeItalic, FormatValue};
 
 use self::content_blocks::BlockImage;
+use text_formatting::{FormatTypeLink, FormatTypeStrikeThrough};
 
 #[derive(Debug)]
 pub enum NPFConvertError {
@@ -86,6 +87,22 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                     post.content.append(&mut content);
                     // println!("{:#?}", post);
 
+                    Ok(())
+                }
+                NodeValue::Strikethrough => {
+                    let mut content = Self::try_from(n)?
+                        .fold_content()
+                        .for_each_content(|c| {
+                            if let BlockValue::Text(ref mut t) = c {
+                                let format = FormatValue::StrikeThrough(
+                                    FormatTypeStrikeThrough::from(&t.text),
+                                );
+                                t.push_formatting(format);
+                                t.text = String::from(t.text.trim());
+                            }
+                        })
+                        .content;
+                    post.content.append(&mut content);
                     Ok(())
                 }
                 _ => Ok(()),
