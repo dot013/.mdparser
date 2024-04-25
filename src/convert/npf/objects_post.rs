@@ -78,12 +78,6 @@ impl Post {
                 }
             })
             .flatten()
-            .map(|mut a| {
-                if let BlockValue::Text(ref mut t) = a {
-                    t.text = String::from(t.text.trim());
-                }
-                a
-            })
             .collect::<Vec<_>>();
         self
     }
@@ -154,8 +148,6 @@ impl From<u64> for Post {
 
 fn fold_text_block(mut acc: BlockText, c: &mut BlockValue) -> BlockText {
     if let BlockValue::Text(t) = c {
-        let text = &t.text.trim();
-
         if let Some(ref mut f) = &mut t.formatting {
             let offset = acc.text.chars().count() as u64;
             f.iter_mut().for_each(|f| f.offset(offset));
@@ -166,8 +158,7 @@ fn fold_text_block(mut acc: BlockText, c: &mut BlockValue) -> BlockText {
                 acc.formatting = Some(f.to_vec());
             }
         }
-
-        acc.text.push_str(&format!("{} ", text));
+        acc.text.push_str(&t.text);
     }
     acc
 }

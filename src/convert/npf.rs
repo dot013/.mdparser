@@ -1,12 +1,8 @@
-use std::{
-    borrow::{Borrow, BorrowMut},
-    cell::RefCell,
-    collections::VecDeque,
-};
+use std::cell::RefCell;
 
 use comrak::{
-    arena_tree::Node,
-    nodes::{Ast, AstNode, NodeValue},
+    arena_tree::{Children, Node},
+    nodes::{Ast, NodeValue},
 };
 
 pub mod attributions;
@@ -28,111 +24,87 @@ pub enum NPFConvertError {
     InvalidURL { url: String, err: url::ParseError },
 }
 
-fn extract_text(contents: &Vec<BlockValue>) -> String {
-    contents
-        .iter()
-        .fold(String::new(), |mut a, c| {
-            if let BlockValue::Text(block) = c {
-                a.push_str(&format!(" {}", block.text));
-            }
-            a
+impl<'a> TryFrom<Children<'a, RefCell<Ast>>> for objects::Post {
+    type Error = NPFConvertError;
+    fn try_from(mut nodes: Children<'a, RefCell<Ast>>) -> Result<Self, Self::Error> {
+        nodes.try_fold(Self::new(0), |mut acc, n| {
+            acc.content.append(&mut Self::try_from(n)?.content);
+            Ok(acc)
         })
-        .trim()
-        .to_string()
+    }
 }
 
 impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
     type Error = NPFConvertError;
-    fn try_from(value: &'a Node<'a, RefCell<Ast>>) -> Result<Self, Self::Error> {
-        let mut post = Self::new(0);
-
-        let nodes = value.children().into_iter();
-        let r: Result<Vec<_>, NPFConvertError> = nodes
-            .map(|n| match &n.data.borrow().value {
-                NodeValue::Paragraph => {
-                    let mut paragraph_contents = Self::try_from(n)?.content;
-                    post.content.append(&mut paragraph_contents);
-                    Ok(())
-                }
-                NodeValue::Text(t) => {
-                    let block_text = BlockText::from(String::from(t.clone()));
-                    post.content.push(BlockValue::Text(block_text));
-                    Ok(())
-                }
-                NodeValue::Strong => {
-                    let mut content = Self::try_from(n)?
-                        .fold_content()
-                        .for_each_content(|c| {
-                            if let BlockValue::Text(ref mut t) = c {
-                                let format = FormatValue::Bold(FormatTypeBold::from(&t.text));
-                                t.push_formatting(format);
-                                t.text = String::from(t.text.trim());
-                            }
-                        })
-                        .content;
-                    post.content.append(&mut content);
-                    Ok(())
-                }
-                NodeValue::Emph => {
-                    let mut content = Self::try_from(n)?
-                        .fold_content()
-                        .for_each_content(|c| {
-                            if let BlockValue::Text(ref mut t) = c {
-                                let format = FormatValue::Italic(FormatTypeItalic::from(&t.text));
-                                t.push_formatting(format);
-                                t.text = String::from(t.text.trim());
-                            }
-                        })
-                        .content;
-                    post.content.append(&mut content);
-                    // println!("{:#?}", post);
-
-                    Ok(())
-                }
-                NodeValue::Strikethrough => {
-                    let mut content = Self::try_from(n)?
-                        .fold_content()
-                        .for_each_content(|c| {
-                            if let BlockValue::Text(ref mut t) = c {
-                                let format = FormatValue::StrikeThrough(
-                                    FormatTypeStrikeThrough::from(&t.text),
-                                );
-                                t.push_formatting(format);
-                                t.text = String::from(t.text.trim());
-                            }
-                        })
-                        .content;
-                    post.content.append(&mut content);
-                    Ok(())
-                }
-                NodeValue::Link(link) => match url::Url::parse(&link.url) {
-                    Ok(url) => {
-                        let mut content = Self::try_from(n)?
-                            .fold_content()
-                            .for_each_content(|c| {
-                                if let BlockValue::Text(ref mut t) = c {
-                                    let mut format = FormatTypeLink::from(&t.text);
-                                    format.url = url.clone();
-                                    t.push_formatting(FormatValue::Link(format));
-                                    t.text = String::from(t.text.trim());
-                                }
-                            })
-                            .content;
-                        post.content.append(&mut content);
-                        Ok(())
+    fn try_from(node: &'a Node<'a, RefCell<Ast>>) -> Result<Self, Self::Error> {
+        match &node.data.borrow().value {
+            NodeValue::Document => Self::try_from(node.children()),
+            NodeValue::Paragraph => {
+                let p = Self::try_from(node.children())?.fold_content();
+                println!("{p:#?}");
+                Ok(p)
+            }
+            NodeValue::Text(t) => {
+                let mut post = Self::new(0);
+                let block_text = BlockText::from(String::from(t.clone()));
+                post.content.push(BlockValue::Text(block_text));
+                Ok(post)
+            }
+            NodeValue::Strong => Ok(Self::try_from(node.children())?
+                .fold_content()
+                .for_each_content(|c| {
+                    if let BlockValue::Text(ref mut t) = c {
+                        let format = FormatValue::Bold(FormatTypeBold::from(&t.text));
+                        t.push_formatting(format);
+                        // t.text = String::from(t.text.trim());
                     }
-                    Err(err) => Err(NPFConvertError::InvalidURL {
-                        url: link.url.clone(),
-                        err,
-                    }),
-                },
-                _ => Ok(()),
-            })
-            .collect();
-        if let Err(e) = r {
-            Err(e)
-        } else {
-            Ok(post)
+                })),
+            NodeValue::Emph => Ok(Self::try_from(node.children())?
+                .fold_content()
+                .for_each_content(|c| {
+                    if let BlockValue::Text(ref mut t) = c {
+                        let format = FormatValue::Italic(FormatTypeItalic::from(&t.text));
+                        t.push_formatting(format);
+                        // t.text = String::from(t.text.trim());
+                    }
+                })),
+            NodeValue::Strikethrough => Ok(Self::try_from(node.children())?
+                .fold_content()
+                .for_each_content(|c| {
+                    if let BlockValue::Text(ref mut t) = c {
+                        let format =
+                            FormatValue::StrikeThrough(FormatTypeStrikeThrough::from(&t.text));
+                        t.push_formatting(format);
+                        // t.text = String::from(t.text.trim());
+                    }
+                })),
+            NodeValue::Link(link) => match url::Url::parse(&link.url) {
+                Ok(url) => Ok(Self::try_from(node.children())?
+                    .fold_content()
+                    .for_each_content(|c| {
+                        if let BlockValue::Text(ref mut t) = c {
+                            let mut format = FormatTypeLink::from(&t.text);
+                            format.url = url.clone();
+                            t.push_formatting(FormatValue::Link(format));
+                            // t.text = String::from(t.text.trim());
+                        }
+                    })),
+                Err(err) => Err(NPFConvertError::InvalidURL {
+                    url: link.url.clone(),
+                    err,
+                }),
+            },
+            NodeValue::SoftBreak => {
+                let mut post = Self::new(0);
+                post.content.push(BlockValue::Text(BlockText::from(" ")));
+                Ok(post)
+            }
+            NodeValue::LineBreak => {
+                let mut post = Self::new(0);
+                post.content.push(BlockValue::Text(BlockText::from("\n")));
+                Ok(post)
+            }
+            _ => Ok(Self::new(0)),
         }
     }
 }
