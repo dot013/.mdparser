@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+
+set_colors() {
+	RED="\033[31m"
+	RESET_COLOR="\033[m"
+}
+set_colors
+
+panic() {
+	local reason="$1"
+	echo -e "${RED}[Invalid Commit Message]${RESET_COLOR}"
+	echo -e "------------------------"
+	echo -e "Reason: ${RED}$reason${RESET_COLOR}"
+	exit 1
+}
+
+
+enabled=""$X_GIT_HOOK_CONVENTIONAL_COMMITS_ENABLED;
+if [[ "$enabled" == "" ]]; then
+	enabled=true
+fi
+
+if [[ "$enabled" == 0 || ! $enabled ]]; then
+	exit 0
+fi
+
+min_length=""$X_GIT_HOOK_CONVENTIONAL_COMMITS_MIN_LENGTH;
+if [[ "$min_length" != 0 && ! "$min_length" ]]; then
+	min_length=1
+fi
+
+max_length=""$X_GIT_HOOK_CONVENTIONAL_COMMITS_MAX_LENGTH;
+if [[ "$max_length" != 0 && ! "$max_length" ]]; then
+	max_length=52
+fi
+
+get_casing() {
+	local casing="$1"
+
+	if [[ ! "$casing" ]]; then
+		casing=""$X_GIT_HOOK_CONVENTIONAL_COMMITS_CASING
+	fi
+
+	if [[ ! "$casing" ]]; then
+		casing="all-lower-ascii"
+	fi
+
+	echo "$casing";
+}
+
+
+check_casing() {
+	local string="$1"
+	local casing="$(get_casing "$2")"
+
+	if [[ $casing == "ascii" && $string =~ ^[a-zA-Z0-9]+$ ]]; then
+		true
+	elif [[ $casing == "all-lower-ascii" && $string =~ ^[a-z0-9]+$ ]]; then
+		true
+	elif [[ $casing == "all-upper-ascii" && $string =~ ^[A-Z0-9]+$ ]]; then
+		true
+	else
+		false
+	fi
+}
+
+check_type() {
+	local revert="$X_GIT_HOOK_CONVENTIONAL_COMMITS_REVERT";
+	local input_type="$1"
+	local revert="";
+
+	if [[ ! "$revert" ]]; then
+		revert="$X_GIT_HOOK_CONVENTIONAL_COMMITS_REVERT"
+	fi
+	if [[ ! "$revert" ]]; then
+		revert="true"
+	fi
+
+	if [[ "$revert" != false && ! "$revert" ]]; then
+		revert=true
+	fi
+
+	IFS=',' read -r -a types <<< "$X_GIT_HOOK_CONVENTIONAL_COMMITS_TYPES";
+	unset IFS
+	if [[ "${types[0]}" == "" ]]; then
+		types=(
+			"build"
+			"ci"
+			"docs"
+			"feat"
+			"fix"
+			"perf"
+			"refactor"
+			"style"
+			"test"
+			"chore"
+		);
+	fi
+
+	if "$revert"; then
+		types["${#types[@]}" + 1]="revert"
+	fi
+
+	for type in "${types[@]}"; do
+		[[ "$type" == "$input_type" ]] && return 0
+	done
+	panic "Message <type> \"$input_type\" is not valid"
+}
+
+check_prefix() {
+	local type="$1"
+	local scope="";
+
+	if [[ $type == *'('* ]]; then
+		local parts=();
+		IFS='(' read -r -a parts <<< "$type"
+
+		type="${parts[0]}"
+		scope="${parts[1]}"
+
+		scope="${scope/!}"
+		scope="${scope/\)}"
+	fi
+
+	if check_casing "$type"; then
+		check_type "$(echo "$type" | tr '[:upper:]' '[:lower:]')"
+	else
+		panic "<prefix> \"$type\" is not in correct casing ($(get_casing))";
+	fi
+
+	if check_casing "$scope"; then
+		false
+	else
+		panic "[optional scope] \"$scope\" is not in correct casing ($(get_casing))";
+	fi
+
+	echo "$type $scope"
+}
+
+check_header() {
+	local header="$1"
+
+	echo "$header"
+
+	if [[ $header != *':'* ]]; then
+		panic "Message doesn't contain a <type>:"
+	fi
+
+	local parts=();
+	IFS=':' read -r -a parts <<< "$header"
+
+	if [[ ${#parts[@]} < 2 || ! ${parts[0]} || ! ${parts[1]} ]]; then
+		panic "Message doesn't contain <type>: <description>\n${parts[@]}"
+	fi
+
+	check_prefix "${parts[0]}"
+}
+
+check_msg() {
+	local message="$1"
+	local header="$(echo "$message" | head -1 -)"
+
+	check_header "$1"
+}
+
+if [[ -f "$1" || "$1" == "-" ]]; then
+	check_msg "$(cat "$1")"
+else
+	check_msg "$1"
+fi
