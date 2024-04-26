@@ -16,3 +16,7 @@ serde_json = "1.0.114"
 serde_with = { version = "3.7.0", features = [ "macros" ] }
 serde_yaml = "0.9.34"
 url = { version = "2.5.0", features = ["serde"] }
+
+[features]
+default = ["uuid-link-to-mention"]
+uuid-link-to-mention = []

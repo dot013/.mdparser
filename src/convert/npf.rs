@@ -18,6 +18,8 @@ use text_formatting::{FormatTypeBold, FormatTypeItalic, FormatValue};
 
 use text_formatting::{FormatTypeLink, FormatTypeStrikeThrough};
 
+use self::{objects::BlogInfo, text_formatting::FormatTypeMention};
+
 #[derive(Debug)]
 pub enum NPFConvertError {
     TODO,
@@ -78,10 +80,23 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                         // t.text = String::from(t.text.trim());
                     }
                 })),
-            NodeValue::Link(link) => match url::Url::parse(&link.url) {
-                Ok(url) => Ok(Self::try_from(node.children())?
-                    .fold_content()
-                    .for_each_content(|c| {
+            NodeValue::Link(link) => {
+                let content = Self::try_from(node.children())?.fold_content();
+
+                #[cfg(feature = "uuid-link-to-mention")]
+                if link.url.starts_with("t:") {
+                    return Ok(content.for_each_content(|c| {
+                        if let BlockValue::Text(ref mut t) = c {
+                            let blog = BlogInfo::new(&link.url);
+                            let format =
+                                FormatTypeMention::new(0..t.text.chars().count() as u64, blog);
+                            t.push_formatting(FormatValue::Mention(format));
+                        }
+                    }));
+                }
+
+                match url::Url::parse(&link.url) {
+                    Ok(url) => Ok(content.for_each_content(|c| {
                         if let BlockValue::Text(ref mut t) = c {
                             let mut format = FormatTypeLink::from(&t.text);
                             format.url = url.clone();
@@ -89,11 +104,12 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                             // t.text = String::from(t.text.trim());
                         }
                     })),
-                Err(err) => Err(NPFConvertError::InvalidURL {
-                    url: link.url.clone(),
-                    err,
-                }),
-            },
+                    Err(err) => Err(NPFConvertError::InvalidURL {
+                        url: link.url.clone(),
+                        err,
+                    }),
+                }
+            }
             NodeValue::SoftBreak => {
                 let mut post = Self::new(0);
                 post.content.push(BlockValue::Text(BlockText::from(" ")));
@@ -118,8 +134,10 @@ mod tests {
 
     use super::content_blocks::BlockValue;
     use crate::convert::npf;
+    use crate::convert::npf::objects::BlogInfo;
     use crate::convert::npf::text_formatting::{
-        FormatTypeBold, FormatTypeItalic, FormatTypeLink, FormatTypeStrikeThrough, FormatValue,
+        FormatTypeBold, FormatTypeItalic, FormatTypeLink, FormatTypeMention,
+        FormatTypeStrikeThrough, FormatValue,
     };
     use crate::utils;
     use comrak::Arena;
@@ -337,10 +355,19 @@ mod tests {
 
     #[test]
     fn text_block_paragraph() {
+        #[cfg(not(feature = "uuid-link-to-mention"))]
         let markdown = "If **you** are reading this, thanks for giving a look\n\
                         and checking the ~~ugly~~ source code of this *little\n\
                         **personal** project*. It is heart warming to know that *at least*\n\
                         someone found this interesting and maybe useful, even knowing\n\
+                        how niched this whole project is.\\
+                        - [Gustavo \"Guz\" L. de Mello](https://guz.one), Apr 16, 12.2024";
+
+        #[cfg(feature = "uuid-link-to-mention")]
+        let markdown = "If **you** are reading this, thanks for giving a look\n\
+                        and checking the ~~ugly~~ source code of this *little\n\
+                        **personal** project*. It is heart warming to know that *at least*\n\
+                        [someone](t:_YENQUPzd_oPpmVDqZQ-yw) found this interesting and maybe useful, even knowing\n\
                         how niched this whole project is.\\
                         - [Gustavo \"Guz\" L. de Mello](https://guz.one), Apr 16, 12.2024";
 
@@ -354,6 +381,11 @@ mod tests {
             FormatValue::Bold(FormatTypeBold::from(99..107)),
             FormatValue::Italic(FormatTypeItalic::from(92..115)),
             FormatValue::Italic(FormatTypeItalic::from(150..158)),
+            #[cfg(feature = "uuid-link-to-mention")]
+            FormatValue::Mention(FormatTypeMention::new(
+                159..166,
+                BlogInfo::new("t:_YENQUPzd_oPpmVDqZQ-yw"),
+            )),
             FormatValue::Link(FormatTypeLink::new(
                 257..282,
                 url::Url::parse("https://guz.one").unwrap(),
