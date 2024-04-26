@@ -74,13 +74,3 @@ where
     None
 }
 
-pub fn extract_text<'a>(node: &'a comrak::nodes::AstNode<'a>) -> String {
-    let text = RefCell::new(String::new());
-    iter_nodes(node, &|node| {
-        if let NodeValue::Text(t) = &node.data.borrow().value {
-            text.borrow_mut().push_str(&t);
-        }
-    });
-    let r = text.borrow().to_string();
-    r
-}

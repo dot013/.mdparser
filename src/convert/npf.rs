@@ -26,6 +26,38 @@ pub enum NPFConvertError {
     InvalidURL { url: String, err: url::ParseError },
 }
 
+#[cfg(any(feature = "npf-runtime-asserts", test, debug_assertions))]
+macro_rules! assert_npf_eq_node_text {
+    ($b:expr, $n:expr) => {
+        match ($b, $n) {
+            (left, right) => {
+                let npf_text = {
+                    let text = RefCell::new(String::new());
+                    left.clone().for_each_content(|c| {
+                        if let BlockValue::Text(t) = c {
+                            text.borrow_mut().push_str(&t.text);
+                        }
+                    });
+                    let r = text.borrow().to_string();
+                    r
+                };
+                let markdown_text = {
+                    let text = RefCell::new(String::new());
+                    crate::utils::iter_nodes(right, &|node| match &node.data.borrow().value {
+                        NodeValue::Text(t) => text.borrow_mut().push_str(&t),
+                        NodeValue::SoftBreak => text.borrow_mut().push_str(" "),
+                        NodeValue::LineBreak => text.borrow_mut().push_str("\n"),
+                        _ => (),
+                    });
+                    let r = text.borrow().to_string();
+                    r
+                };
+                assert_eq!(npf_text, markdown_text);
+            }
+        };
+    };
+}
+
 impl<'a> TryFrom<Children<'a, RefCell<Ast>>> for objects::Post {
     type Error = NPFConvertError;
     fn try_from(mut nodes: Children<'a, RefCell<Ast>>) -> Result<Self, Self::Error> {
@@ -50,36 +82,49 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                 let mut post = Self::new(0);
                 let block_text = BlockText::from(String::from(t.clone()));
                 post.content.push(BlockValue::Text(block_text));
+                assert_npf_eq_node_text!(&post, &node);
                 Ok(post)
             }
-            NodeValue::Strong => Ok(Self::try_from(node.children())?
-                .fold_content()
-                .for_each_content(|c| {
-                    if let BlockValue::Text(ref mut t) = c {
-                        let format = FormatValue::Bold(FormatTypeBold::from(&t.text));
-                        t.push_formatting(format);
-                        // t.text = String::from(t.text.trim());
-                    }
-                })),
-            NodeValue::Emph => Ok(Self::try_from(node.children())?
-                .fold_content()
-                .for_each_content(|c| {
-                    if let BlockValue::Text(ref mut t) = c {
-                        let format = FormatValue::Italic(FormatTypeItalic::from(&t.text));
-                        t.push_formatting(format);
-                        // t.text = String::from(t.text.trim());
-                    }
-                })),
-            NodeValue::Strikethrough => Ok(Self::try_from(node.children())?
-                .fold_content()
-                .for_each_content(|c| {
-                    if let BlockValue::Text(ref mut t) = c {
-                        let format =
-                            FormatValue::StrikeThrough(FormatTypeStrikeThrough::from(&t.text));
-                        t.push_formatting(format);
-                        // t.text = String::from(t.text.trim());
-                    }
-                })),
+            NodeValue::Strong => {
+                let strong = Self::try_from(node.children())?
+                    .fold_content()
+                    .for_each_content(|c| {
+                        if let BlockValue::Text(ref mut t) = c {
+                            let format = FormatValue::Bold(FormatTypeBold::from(&t.text));
+                            t.push_formatting(format);
+                        }
+                    });
+
+                assert_npf_eq_node_text!(&strong, &node);
+                Ok(strong)
+            }
+            NodeValue::Emph => {
+                let italic = Self::try_from(node.children())?
+                    .fold_content()
+                    .for_each_content(|c| {
+                        if let BlockValue::Text(ref mut t) = c {
+                            let format = FormatValue::Italic(FormatTypeItalic::from(&t.text));
+                            t.push_formatting(format);
+                        }
+                    });
+
+                assert_npf_eq_node_text!(&italic, &node);
+                Ok(italic)
+            }
+            NodeValue::Strikethrough => {
+                let strike_through = Self::try_from(node.children())?
+                    .fold_content()
+                    .for_each_content(|c| {
+                        if let BlockValue::Text(ref mut t) = c {
+                            let format =
+                                FormatValue::StrikeThrough(FormatTypeStrikeThrough::from(&t.text));
+                            t.push_formatting(format);
+                        }
+                    });
+
+                assert_npf_eq_node_text!(&strike_through, &node);
+                Ok(strike_through)
+            }
             NodeValue::Link(link) => {
                 let content = Self::try_from(node.children())?.fold_content();
 
@@ -101,7 +146,6 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                             let mut format = FormatTypeLink::from(&t.text);
                             format.url = url.clone();
                             t.push_formatting(FormatValue::Link(format));
-                            // t.text = String::from(t.text.trim());
                         }
                     })),
                     Err(err) => Err(NPFConvertError::InvalidURL {

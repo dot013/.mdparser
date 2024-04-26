@@ -20,3 +20,4 @@ url = { version = "2.5.0", features = ["serde"] }
 [features]
 default = ["uuid-link-to-mention"]
 uuid-link-to-mention = []
+npf-runtime-asserts = []
