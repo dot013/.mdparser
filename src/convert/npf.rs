@@ -13,7 +13,7 @@ pub mod text_formatting;
 
 mod objects_post;
 
-use content_blocks::{BlockImage, BlockText, BlockValue};
+use content_blocks::{BlockImage, BlockText, BlockTextSubtype, BlockValue};
 use objects::{BlogInfo, Media};
 use text_formatting::{FormatTypeBold, FormatTypeItalic, FormatValue};
 
@@ -82,6 +82,29 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                 let block_text = BlockText::from(String::from(t.clone()));
                 post.content.push(BlockValue::Text(block_text));
                 assert_npf_eq_node_text!(&post, &node);
+                Ok(post)
+            }
+            NodeValue::Heading(h) => {
+                let mut post = Self::try_from(node.children())?.fold_content();
+                let heading = &mut post.content[0];
+                if let BlockValue::Text(ref mut t) = heading {
+                    match h.level {
+                        1 => {
+                            t.subtype = Some(BlockTextSubtype::Heading1);
+                        }
+                        2 => {
+                            t.subtype = Some(BlockTextSubtype::Heading2);
+                        }
+                        _ => {
+                            let formatting = FormatValue::Bold(FormatTypeBold::from(&t.text));
+                            if let Some(ref mut f) = &mut t.formatting {
+                                f.push(formatting);
+                            } else {
+                                t.formatting = Some(vec![formatting]);
+                            }
+                        }
+                    };
+                };
                 Ok(post)
             }
             NodeValue::Strong => {
