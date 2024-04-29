@@ -47,6 +47,10 @@ enum Commands {
         #[arg(short, long, num_args = 2, value_names = ["FROM", "TO"])]
         rename_prop: Vec<String>,
     },
+    Convert {
+        #[arg(short, long)]
+        format: convert::Formats,
+    },
 }
 
 fn main() {
@@ -72,12 +76,6 @@ fn main() {
 
     let arena = comrak::Arena::new();
     let ast = comrak::parse_document(&arena, &file, &mdparser::utils::default_options());
-
-    match convert::npf::from(ast) {
-        Ok(test) => println!("{}", serde_json::to_string_pretty(&test).unwrap()),
-        Err(err) => println!("{err:#?}"),
-    };
-    // println!("{:#?}", ast);
 
     let result = match cli.command {
         Commands::Links { list, replace_url } => {
@@ -137,12 +135,44 @@ fn main() {
                 cli::ResultType::Markdown(ast)
             }
         }
-        _ => cli::ResultType::Err(cli::Error {
-            description: "".to_string(),
-            code: cli::ErrorCode::EPRSG,
-            url: None,
-            fix: None,
-        }),
+        Commands::Convert { format } => match format {
+            convert::Formats::NPF => match convert::npf::from(ast) {
+                Ok(npf) => {
+                    let function = if cli.input.is_tty() {
+                        serde_json::to_string_pretty
+                    } else {
+                        serde_json::to_string
+                    };
+
+                    match function(&npf).map_err(|e| {
+                        cli::ResultType::Err(cli::Error {
+                            description: format!(
+                                "Failed to parse Tumblr NPF struct to JSON string
+                            on line {}, column {}. Used vector: \n{:#?}",
+                                e.line(),
+                                e.column(),
+                                &npf
+                            ),
+                            code: cli::ErrorCode::EPRSG,
+                            url: None,
+                            fix: None,
+                        })
+                    }) {
+                        Ok(s) => cli::ResultType::String(s),
+                        Err(e) => e,
+                    }
+                }
+                Err(err) => cli::ResultType::Err(cli::Error {
+                    description: format!(
+                        "Failed to convert to Tumblr NPF format, due to error:\n{:#?}",
+                        err
+                    ),
+                    code: cli::ErrorCode::ECNPF,
+                    url: None,
+                    fix: None,
+                }),
+            },
+        },
     };
 
     if let cli::ListFormat::JSON = &cli.list_format {
@@ -239,6 +269,7 @@ mod cli {
     #[derive(Debug)]
     pub enum ErrorCode {
         EPRSG,
+        ECNPF,
         EIORD,
         EIOWR,
         EIOTY,
@@ -261,6 +292,7 @@ mod cli {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let title = match self.code {
                 ErrorCode::EPRSG => "Parsing error",
+                ErrorCode::ECNPF => "Error converting to NPF format",
                 ErrorCode::EIORD => "IO error on read operation",
                 ErrorCode::EIOWR => "IO error on write operation",
                 ErrorCode::EIOTY => "IO error on input/output type",
