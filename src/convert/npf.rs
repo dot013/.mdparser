@@ -77,6 +77,10 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                 println!("{p:#?}");
                 Ok(p)
             }
+            NodeValue::BlockQuote => {
+                let p = Self::try_from(node.children())?.join_content("\n\n");
+                Ok(p)
+            }
             NodeValue::Text(t) => {
                 let mut post = Self::new(0);
                 let block_text = BlockText::from(String::from(t.clone()));
