@@ -60,7 +60,10 @@ impl Post {
             false
         }
     }
-    pub fn fold_content(mut self) -> Self {
+    pub fn fold_content(self) -> Self {
+        self.join_content("")
+    }
+    pub fn join_content<'a>(mut self, sep: &'a str) -> Self {
         // TODO: Some form of folding also the layout of the npf
         let groups = self.content.iter_mut().group_by(|c| match c {
             BlockValue::Text(_) => true,
@@ -71,7 +74,9 @@ impl Post {
             .map(|a| {
                 if a.0 == true {
                     vec![BlockValue::Text(
-                        a.1.fold(BlockText::new(&String::new()), fold_text_block),
+                        a.1.fold(BlockText::new(&String::new()), |acc, c| {
+                            fold_text_block_with_sep(acc, c, &sep)
+                        }),
                     )]
                 } else {
                     a.1.map(|c| c.to_owned()).collect::<Vec<_>>()
@@ -79,6 +84,10 @@ impl Post {
             })
             .flatten()
             .collect::<Vec<_>>();
+        let block = &mut self.content[0];
+        if let BlockValue::Text(ref mut t) = block {
+            t.text = String::from(t.text.strip_suffix(sep).unwrap_or(&t.text));
+        }
         self
     }
     pub fn for_each_content<F>(mut self, f: F) -> Self
@@ -146,7 +155,7 @@ impl From<u64> for Post {
     }
 }
 
-fn fold_text_block(mut acc: BlockText, c: &mut BlockValue) -> BlockText {
+fn fold_text_block_with_sep<'a>(mut acc: BlockText, c: &mut BlockValue, sep: &'a str) -> BlockText {
     if let BlockValue::Text(t) = c {
         if let Some(ref mut f) = &mut t.formatting {
             let offset = acc.text.chars().count() as u64;
@@ -158,7 +167,7 @@ fn fold_text_block(mut acc: BlockText, c: &mut BlockValue) -> BlockText {
                 acc.formatting = Some(f.to_vec());
             }
         }
-        acc.text.push_str(&t.text);
+        acc.text.push_str(&format!("{}{}", &t.text, sep));
     }
     acc
 }
