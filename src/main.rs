@@ -7,7 +7,6 @@ use clio::Input;
 use mdparser::convert;
 use mdparser::frontmatter::Frontmatter;
 use mdparser::links;
-use mdparser::utils;
 
 #[derive(Parser, Debug)]
 #[command(version = "0.1", about = "", long_about = None, propagate_version = true)]

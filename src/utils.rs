@@ -1,7 +1,3 @@
-use std::cell::RefCell;
-
-use comrak::nodes::NodeValue;
-
 pub fn default_options() -> comrak::Options {
     let mut opts = comrak::Options::default();
 
@@ -73,4 +69,3 @@ where
     }
     None
 }
-

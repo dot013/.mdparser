@@ -74,7 +74,6 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
             NodeValue::Document => Self::try_from(node.children()),
             NodeValue::Paragraph => {
                 let p = Self::try_from(node.children())?.fold_content();
-                println!("{p:#?}");
                 Ok(p)
             }
             NodeValue::BlockQuote => {
