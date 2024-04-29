@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 pub use super::objects_post::Post;
+use mime_serde_shim::Wrapper as Mime;
 
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -78,8 +79,9 @@ pub struct Avatar {
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Media {
-    pub r#type: Option<String>,
-    pub url: url::Url,
+    pub r#type: Option<Mime>,
+    pub url: Option<url::Url>,
+    pub identifier: Option<String>,
     pub width: Option<u64>,
     pub height: Option<u64>,
     pub original_dimensions_missing: Option<bool>,
@@ -87,13 +89,17 @@ pub struct Media {
     pub has_original_dimentions: Option<bool>,
 }
 impl Media {
-    pub fn new(url: url::Url) -> Self {
-        Self::from(url)
+    pub fn new(identifier: String) -> Self {
+        Self::from(identifier)
+    }
+    pub fn is_valid(&self) -> bool {
+        self.url.is_some() || self.identifier.is_some()
     }
     fn default() -> Self {
         Self {
             r#type: None,
-            url: url::Url::parse("https://tumblr.com").unwrap(),
+            url: None,
+            identifier: None,
             width: None,
             height: None,
             original_dimensions_missing: None,
@@ -102,10 +108,35 @@ impl Media {
         }
     }
 }
+impl From<String> for Media {
+    fn from(value: String) -> Self {
+        let mime = if let Some(m) = mime_guess::from_path(&value).first() {
+            Some(Mime::from(m))
+        } else {
+            None
+        };
+        Self {
+            r#type: mime,
+            identifier: Some(value),
+            ..Self::default()
+        }
+    }
+}
+impl From<&str> for Media {
+    fn from(value: &str) -> Self {
+        Self::from(String::from(value))
+    }
+}
 impl From<url::Url> for Media {
     fn from(value: url::Url) -> Self {
+        let mime = if let Some(m) = mime_guess::from_path(&value.to_string()).first() {
+            Some(Mime::from(m))
+        } else {
+            None
+        };
         Self {
-            url: value,
+            r#type: mime,
+            url: Some(value),
             ..Self::default()
         }
     }

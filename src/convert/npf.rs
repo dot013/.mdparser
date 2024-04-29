@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::{borrow::Borrow, cell::RefCell, path, str::FromStr};
 
 use comrak::{
     arena_tree::{Children, Node},
@@ -13,12 +13,11 @@ pub mod text_formatting;
 
 mod objects_post;
 
-use content_blocks::{BlockText, BlockValue};
+use content_blocks::{BlockImage, BlockText, BlockValue};
+use objects::{BlogInfo, Media};
 use text_formatting::{FormatTypeBold, FormatTypeItalic, FormatValue};
 
-use text_formatting::{FormatTypeLink, FormatTypeStrikeThrough};
-
-use self::{objects::BlogInfo, text_formatting::FormatTypeMention};
+use text_formatting::{FormatTypeLink, FormatTypeMention, FormatTypeStrikeThrough};
 
 #[derive(Debug)]
 pub enum NPFConvertError {
@@ -163,6 +162,53 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                 let mut post = Self::new(0);
                 post.content.push(BlockValue::Text(BlockText::from("\n")));
                 Ok(post)
+            }
+            NodeValue::Image(i) => {
+                let alt_text = Self::try_from(node.children())?.fold_content();
+                if let Some(p) = node.parent() {
+                    if let NodeValue::Paragraph = p.data.borrow().value {
+                        let alt_text = alt_text
+                            .content
+                            .iter()
+                            .find(|b| {
+                                if let BlockValue::Text(_) = b {
+                                    true
+                                } else {
+                                    false
+                                }
+                            })
+                            .unwrap_or(BlockValue::Text(BlockText::new("")).borrow())
+                            .to_owned();
+                        let alt_text = if let BlockValue::Text(t) = alt_text {
+                            Some(t.text.clone())
+                        } else {
+                            None
+                        };
+
+                        let media = if let Ok(url) = url::Url::from_str(&i.url) {
+                            Media::from(url)
+                        } else if let Some(name) = path::Path::new(&i.url).file_name() {
+                            if let Some(name) = name.to_str() {
+                                Media::from(name)
+                            } else {
+                                Media::from(i.url.as_str())
+                            }
+                        } else {
+                            Media::from(i.url.as_str())
+                        };
+
+                        let mut block = BlockImage::from(media);
+                        block.alt_text = alt_text;
+
+                        let mut post = Self::new(0);
+                        post.content.push(BlockValue::Image(block));
+                        Ok(post)
+                    } else {
+                        Ok(alt_text)
+                    }
+                } else {
+                    Ok(alt_text)
+                }
             }
             _ => Ok(Self::new(0)),
         }
@@ -411,7 +457,7 @@ mod tests {
         let markdown = "If **you** are reading this, thanks for giving a look\n\
                         and checking the ~~ugly~~ source code of this *little\n\
                         **personal** project*. It is heart warming to know that *at least*\n\
-                        [someone](t:_YENQUPzd_oPpmVDqZQ-yw) found this interesting and maybe useful, even knowing\n\
+                        [someone](t:_YENQUPzd_oPpmVDqZQ-yw) found this interesting and maybe useful, ![even knowing](image.png)\n\
                         how niched this whole project is.\\
                         - [Gustavo \"Guz\" L. de Mello](https://guz.one), Apr 16, 12.2024";
 
