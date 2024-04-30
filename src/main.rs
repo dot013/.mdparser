@@ -6,10 +6,10 @@ use clap::{ArgAction, Parser, Subcommand};
 use clio::Input;
 
 use comrak::arena_tree::Node;
-use comrak::nodes::{Ast, AstNode, LineColumn, NodeValue};
-use mdparser::convert;
-use mdparser::frontmatter::Frontmatter;
-use mdparser::links;
+use comrak::nodes::{Ast, LineColumn, NodeValue};
+use dot013_mdparser::convert;
+use dot013_mdparser::frontmatter::Frontmatter;
+use dot013_mdparser::links;
 
 #[derive(Parser, Debug)]
 #[command(version = "0.1", about = "", long_about = None, propagate_version = true)]
@@ -90,7 +90,7 @@ fn main() {
     };
 
     let arena = comrak::Arena::new();
-    let ast = comrak::parse_document(&arena, &file, &mdparser::utils::default_options());
+    let ast = comrak::parse_document(&arena, &file, &dot013_mdparser::utils::default_options());
 
     let result = match &cli.command {
         Commands::Links { list, replace_url } => {
@@ -284,7 +284,7 @@ mod cli {
     use std::{cell::RefCell, fmt};
 
     use comrak::{arena_tree::Node, nodes::Ast};
-    use mdparser::utils;
+    use dot013_mdparser::utils;
 
     #[derive(Clone, Debug, clap::ValueEnum)]
     pub enum ListFormat {
