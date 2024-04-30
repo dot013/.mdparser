@@ -1,5 +1,5 @@
 [package]
-name = "mdparser"
+name = "dot013-mdparser"
 version = "0.1.0"
 edition = "2021"
 
