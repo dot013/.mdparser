@@ -1,9 +1,12 @@
+use std::cell::RefCell;
 use std::io::Write;
 use std::path::PathBuf;
 
 use clap::{ArgAction, Parser, Subcommand};
 use clio::Input;
 
+use comrak::arena_tree::Node;
+use comrak::nodes::{Ast, AstNode, LineColumn, NodeValue};
 use mdparser::convert;
 use mdparser::frontmatter::Frontmatter;
 use mdparser::links;
@@ -28,6 +31,25 @@ struct Cli {
 }
 
 #[derive(Debug, Subcommand)]
+enum FrontmatterCommands {
+    Set {
+        #[clap()]
+        property: String,
+
+        #[clap()]
+        value: serde_yaml::Value,
+    },
+    Remove {
+        #[clap()]
+        property: String,
+    },
+    Get {
+        #[clap()]
+        property: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
 enum Commands {
     Links {
         #[arg(short, long, action = ArgAction::SetTrue)]
@@ -37,14 +59,8 @@ enum Commands {
         replace_url: Vec<String>,
     },
     Frontmatter {
-        #[arg(short, long, action = ArgAction::SetTrue)]
-        list: bool,
-
-        #[arg(short, long, num_args = 2, value_names = ["PROPERTY", "VALUE"], allow_negative_numbers = true)]
-        set_value: Vec<String>,
-
-        #[arg(short, long, num_args = 2, value_names = ["FROM", "TO"])]
-        rename_prop: Vec<String>,
+        #[command(subcommand)]
+        command: FrontmatterCommands,
     },
     Convert {
         #[arg(short, long)]
@@ -76,12 +92,12 @@ fn main() {
     let arena = comrak::Arena::new();
     let ast = comrak::parse_document(&arena, &file, &mdparser::utils::default_options());
 
-    let result = match cli.command {
+    let result = match &cli.command {
         Commands::Links { list, replace_url } => {
             let list = if replace_url.len() == 0 && !list {
                 true
             } else {
-                list
+                *list
             };
 
             // TODO: Remove clone
@@ -95,43 +111,57 @@ fn main() {
                 cli::ResultType::Markdown(ast)
             }
         }
-        Commands::Frontmatter {
-            list,
-            set_value,
-            rename_prop,
-        } => {
-            let list = if set_value.len() + rename_prop.len() == 0 && !list {
-                true
-            } else {
-                list
-            };
+        Commands::Frontmatter { command } => {
+            if let None = ast.children().find(|c| {
+                if let NodeValue::FrontMatter(_) = c.data.borrow().value {
+                    true
+                } else {
+                    false
+                }
+            }) {
+                let node = arena.alloc(Node::new(RefCell::from(Ast::new(
+                    NodeValue::FrontMatter(String::from("---\n\n---")),
+                    LineColumn { line: 0, column: 0 },
+                ))));
+                ast.prepend(node);
+            }
 
-            let mut frontmatter = Frontmatter::try_from(ast).unwrap();
-
-            // I don't care anymore
-            set_value
-                .chunks(2)
-                .map(|c| {
-                    if let Ok(j) = serde_json::from_str::<serde_json::Value>(&c[1]) {
-                        (c[0].clone(), serde_yaml::to_value(j).unwrap())
-                    } else if let Ok(i) = String::from(&c[1]).parse::<f64>() {
-                        (c[0].clone(), serde_yaml::to_value(i).unwrap())
-                    } else {
-                        (c[0].clone(), serde_yaml::to_value(c[1].clone()).unwrap())
+            match Frontmatter::try_from(ast) {
+                Ok(mut frontmatter) => match command {
+                    FrontmatterCommands::Set { property, value } => {
+                        frontmatter.insert(String::from(property), value.to_owned());
+                        frontmatter.insert_ast(ast);
+                        cli::ResultType::Markdown(ast)
                     }
-                })
-                .for_each(|p| frontmatter.set(&p.0, p.1));
-
-            rename_prop
-                .chunks(2)
-                .for_each(|p| frontmatter.rename_prop(&p[0], &p[1]));
-
-            frontmatter.place_on_ast(ast);
-
-            if list {
-                todo!()
-            } else {
-                cli::ResultType::Markdown(ast)
+                    FrontmatterCommands::Remove { property } => {
+                        let _ = frontmatter.remove(String::from(property));
+                        frontmatter.insert_ast(ast);
+                        cli::ResultType::Markdown(ast)
+                    }
+                    FrontmatterCommands::Get { property } => {
+                        let value = frontmatter
+                            .get(String::from(property))
+                            .unwrap_or(&serde_yaml::Value::Null);
+                        match serde_yaml::to_string(value) {
+                            Ok(s) => cli::ResultType::String(s),
+                            Err(err) => cli::ResultType::Err(cli::Error {
+                                code: cli::ErrorCode::EPRSG,
+                                description: format!(
+                                    "Failed to parse frontmatter value to string\n{:#?}",
+                                    err
+                                ),
+                                fix: None,
+                                url: None,
+                            }),
+                        }
+                    }
+                },
+                Err(err) => cli::ResultType::Err(cli::Error {
+                    code: cli::ErrorCode::EPRSG,
+                    description: format!("Error parsing Markdown frontmatter:\n{:#?}", err),
+                    fix: None,
+                    url: None,
+                }),
             }
         }
         Commands::Convert { format } => match format {

@@ -1,141 +1,155 @@
-use std::cell::RefCell;
+use std::fmt::Display;
 
 use serde_yaml as yaml;
 use std::collections::HashMap;
 
-use comrak::arena_tree::Node;
-use comrak::nodes::{Ast, NodeValue};
+use comrak::nodes::{AstNode, NodeValue};
 
-use crate::utils;
+#[derive(Debug)]
+pub enum FrontmatterErr {
+    InvalidFrontmatter,
+    Parsing(yaml::Error),
+}
 
 #[derive(Debug)]
 pub struct Frontmatter {
     map: HashMap<String, yaml::Value>,
 }
-
 impl<'a> Frontmatter {
-    pub fn new() -> Frontmatter {
-        Frontmatter {
+    pub fn new() -> Self {
+        Self {
             map: HashMap::new(),
         }
     }
-    pub fn get(&self, key: &str) -> Option<&yaml::Value> {
-        self.map.get(key)
+    pub fn parse(string: &'a str) -> Result<HashMap<String, yaml::Value>, FrontmatterErr> {
+        let mut string = string.trim();
+        string = match string.strip_prefix("---") {
+            Some(s) => s,
+            None => return Err(FrontmatterErr::InvalidFrontmatter),
+        };
+        string = match string.strip_suffix("---") {
+            Some(s) => s,
+            None => return Err(FrontmatterErr::InvalidFrontmatter),
+        };
+        string = string.trim();
+        yaml::from_str(string).map_err(|e| FrontmatterErr::Parsing(e))
     }
-    pub fn set(&mut self, key: &str, value: yaml::Value) {
-        self.map.insert(String::from(key), value);
+    pub fn insert(&mut self, key: String, value: yaml::Value) {
+        self.map.insert(key, value);
     }
-    pub fn rename_prop(&mut self, from: &str, to: &str) {
-        if let Some(value) = self.map.get(from) {
-            self.map.insert(String::from(to), value.clone());
-            self.map.remove(from);
+    pub fn remove(&mut self, key: String) -> Option<yaml::Value> {
+        self.map.remove(&key)
+    }
+    pub fn get(&self, key: String) -> Option<&yaml::Value> {
+        self.map.get(&key)
+    }
+    pub fn insert_ast(&self, ast: &'a AstNode<'a>) {
+        if let NodeValue::FrontMatter(ref mut f) = &mut ast.data.borrow_mut().value {
+            *f = self.to_string();
+        } else {
+            for c in ast.children() {
+                self.insert_ast(c)
+            }
         }
     }
-    pub fn place_on_ast(
-        self,
-        ast: &'a Node<'a, RefCell<Ast>>,
-    ) -> RefCell<Result<Option<String>, yaml::Error>> {
-        let result = RefCell::new(Ok(None));
-        utils::iter_nodes(ast, &|node| {
-            if let NodeValue::FrontMatter(ref mut f) = &mut node.data.borrow_mut().value {
-                match String::try_from(&self) {
-                    Ok(s) => {
-                        // I'm sure there's a way to not use clone here, something in the lines
-                        // of passing the pointer of f to the result, and then changing the pointer
-                        // of f to be equals to s. But premature optimisation is the root of all
-                        // evil, and this is a not a "serious" project. When I better learn Rust,
-                        // I hopefully learn how to do this.
-                        //
-                        // - Gustavo "Guz" L. de Mello (2024-04-18)
-                        *result.borrow_mut() = Ok(Some(f.clone()));
-                        f.replace_range(.., &s);
-                    }
-                    Err(e) => {
-                        *result.borrow_mut() = Err(e);
-                    }
-                };
+}
+
+impl<'a> TryFrom<&'a AstNode<'a>> for Frontmatter {
+    type Error = FrontmatterErr;
+    fn try_from(value: &'a AstNode<'a>) -> Result<Self, Self::Error> {
+        if let NodeValue::FrontMatter(f) = &value.data.borrow().value {
+            return Ok(Frontmatter {
+                map: Frontmatter::parse(f)?,
+            });
+        }
+        for node in value.children() {
+            if let NodeValue::FrontMatter(f) = &value.data.borrow().value {
+                return Ok(Frontmatter {
+                    map: Frontmatter::parse(f)?,
+                });
+            } else {
+                return Frontmatter::try_from(node);
             }
-        });
-        result
+        }
+        Ok(Frontmatter::new())
     }
 }
 
-impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for Frontmatter {
-    type Error = yaml::Error;
-    fn try_from(value: &'a Node<'a, RefCell<Ast>>) -> Result<Self, Self::Error> {
-        let str = RefCell::new(String::new());
-        utils::iter_nodes(value, &|node| {
-            if let NodeValue::FrontMatter(f) = &node.data.borrow_mut().value {
-                *str.borrow_mut() = f.to_string();
-            };
-        });
-        let s = str.borrow().clone();
-        Frontmatter::try_from(s)
-    }
-}
-
-impl TryFrom<&str> for Frontmatter {
-    type Error = yaml::Error;
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let value = if value.trim().starts_with("---") {
-            value.split("---").collect::<Vec<&str>>()[1]
-        } else {
-            value
+impl Display for Frontmatter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = match yaml::to_string(&self.map) {
+            Ok(s) => s,
+            Err(_) => return Err(std::fmt::Error),
         };
-        Ok(Frontmatter {
-            map: yaml::from_str::<HashMap<String, yaml::Value>>(&value)?,
-        })
+        write!(f, "---\n{}---\n\n", string)
     }
 }
 
-impl TryFrom<String> for Frontmatter {
-    type Error = yaml::Error;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Frontmatter::try_from(value.as_str())
-    }
-}
+#[cfg(test)]
+mod test {
+    use comrak::Arena;
 
-impl TryFrom<&String> for Frontmatter {
-    type Error = yaml::Error;
-    fn try_from(value: &String) -> Result<Self, Self::Error> {
-        Frontmatter::try_from(value.as_str())
-    }
-}
+    use crate::utils;
 
-impl AsRef<Frontmatter> for Frontmatter {
-    fn as_ref(&self) -> &Frontmatter {
-        self
-    }
-}
+    use super::Frontmatter;
 
-impl AsMut<Frontmatter> for Frontmatter {
-    fn as_mut(&mut self) -> &mut Frontmatter {
-        self
-    }
-}
+    #[test]
+    fn frontmatter_manipulation() {
+        let string = "---\n\
+                    value1: hello world\n\
+                    value2: 5\n\
+                    value3: another value\n\
+                    ---\n\
+                    # Test string\n\
+                    A small phrase for testing y'know";
 
-impl TryFrom<Frontmatter> for String {
-    type Error = yaml::Error;
-    fn try_from(value: Frontmatter) -> Result<Self, Self::Error> {
-        String::try_from(&value)
-    }
-}
+        let arena = Arena::new();
+        let ast = comrak::parse_document(&arena, &string, &utils::default_options());
 
-impl TryFrom<&Frontmatter> for String {
-    type Error = yaml::Error;
-    fn try_from(value: &Frontmatter) -> Result<Self, Self::Error> {
-        Ok(format!("---\n{}---\n\n", yaml::to_string(&value.map)?))
-    }
-}
+        let mut frontmatter = Frontmatter::try_from(ast).unwrap();
 
-impl From<Frontmatter> for HashMap<String, yaml::Value> {
-    fn from(value: Frontmatter) -> Self {
-        value.map
-    }
-}
+        assert_eq!(
+            frontmatter.get(String::from("value1")).unwrap(),
+            &serde_yaml::to_value("hello world").unwrap()
+        );
 
-impl From<&Frontmatter> for HashMap<String, yaml::Value> {
-    fn from(value: &Frontmatter) -> Self {
-        value.map.clone()
+        frontmatter.insert(
+            String::from("value_test"),
+            serde_yaml::to_value("a inserted value").unwrap(),
+        );
+
+        assert_eq!(
+            frontmatter.remove(String::from("value3")),
+            Some(serde_yaml::to_value("another value").unwrap())
+        );
+
+        frontmatter.insert_ast(ast);
+
+        let mut res = vec![];
+        comrak::format_commonmark(ast, &utils::default_options(), &mut res).unwrap();
+        let res = String::from_utf8(res).unwrap();
+
+        let slices = res.split("---").into_iter().collect::<Vec<&str>>();
+        let f = slices[1];
+
+        assert_eq!(
+            f.lines().find(|l| *l == "value1: hello world").unwrap(),
+            "value1: hello world"
+        );
+        assert_eq!(f.lines().find(|l| *l == "value2: 5").unwrap(), "value2: 5");
+        assert_eq!(
+            f.lines()
+                .find(|l| *l == "value_test: a inserted value")
+                .unwrap(),
+            "value_test: a inserted value"
+        );
+
+        assert_eq!(
+            slices[2],
+            "\n\n\
+            # Test string\n\
+            \n\
+            A small phrase for testing y'know\n"
+        );
     }
 }
