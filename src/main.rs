@@ -18,7 +18,7 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    #[arg(global = true, default_value = "-")]
+    #[arg(global = true, default_value = "-", last = true)]
     input: Input,
 
     #[arg(short, long, global = true, action = ArgAction::SetTrue)]
@@ -62,13 +62,19 @@ enum FrontmatterCommands {
 }
 
 #[derive(Debug, Subcommand)]
+enum LinksCommands {
+    List {},
+    Replace {
+        #[clap(num_args = 2, value_names = ["FROM", "TO"], required = true)]
+        replace: Vec<String>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
 enum Commands {
     Links {
-        #[arg(short, long, action = ArgAction::SetTrue)]
-        list: bool,
-
-        #[arg(short, long, num_args = 2, value_names = ["FROM", "TO"])]
-        replace_url: Vec<String>,
+        #[command(subcommand)]
+        command: LinksCommands,
     },
     Frontmatter {
         #[command(subcommand)]
@@ -105,24 +111,15 @@ fn main() {
     let ast = comrak::parse_document(&arena, &file, &dot013_mdparser::utils::default_options());
 
     let result = match &cli.command {
-        Commands::Links { list, replace_url } => {
-            let list = if replace_url.len() == 0 && !list {
-                true
-            } else {
-                *list
-            };
-
-            // TODO: Remove clone
-            replace_url
-                .chunks(2)
-                .for_each(|p| links::replace_links(ast, p[0].clone(), p[1].clone()));
-
-            if list {
-                cli::ResultType::List(links::get_links(ast))
-            } else {
+        Commands::Links { command } => match command {
+            LinksCommands::List {} => cli::ResultType::List(links::get_links(ast)),
+            LinksCommands::Replace { replace } => {
+                replace
+                    .chunks(2)
+                    .for_each(|p| links::replace_links(ast, p[0].clone(), p[1].clone()));
                 cli::ResultType::Markdown(ast)
             }
-        }
+        },
         Commands::Frontmatter { command } => {
             if let None = ast.children().find(|c| {
                 if let NodeValue::FrontMatter(_) = c.data.borrow().value {
