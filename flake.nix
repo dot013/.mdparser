@@ -1,5 +1,5 @@
 {
-  description = "learning.rs";
+  description = "dot013-mdparser";
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
