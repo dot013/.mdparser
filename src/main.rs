@@ -68,6 +68,10 @@ enum LinksCommands {
         #[clap(num_args = 2, value_names = ["FROM", "TO"], required = true)]
         replace: Vec<String>,
     },
+    Remove {
+        #[clap(num_args = 1, value_names = ["URL"], required = true)]
+        links: Vec<String>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -117,6 +121,10 @@ fn main() {
                 replace
                     .chunks(2)
                     .for_each(|p| links::replace_links(ast, &p[0], &p[1]));
+                cli::ResultType::Markdown(ast)
+            }
+            LinksCommands::Remove { links } => {
+                links.iter().for_each(|l| links::remove_link(ast, l));
                 cli::ResultType::Markdown(ast)
             }
         },
