@@ -37,7 +37,7 @@ enum FrontmatterCommands {
         property: String,
 
         #[clap()]
-        value: serde_yaml::Value,
+        value: String,
     },
     Remove {
         #[clap()]
@@ -129,9 +129,22 @@ fn main() {
             match Frontmatter::try_from(ast) {
                 Ok(mut frontmatter) => match command {
                     FrontmatterCommands::Set { property, value } => {
-                        frontmatter.insert(String::from(property), value.to_owned());
-                        frontmatter.insert_ast(ast);
-                        cli::ResultType::Markdown(ast)
+                        match serde_yaml::from_str(&value) {
+                            Ok(value) => {
+                                frontmatter.insert(String::from(property), value);
+                                frontmatter.insert_ast(ast);
+                                cli::ResultType::Markdown(ast)
+                            }
+                            Err(err) => cli::ResultType::Err(cli::Error {
+                                code: cli::ErrorCode::EPRSG,
+                                description: format!(
+                                    "Error parsing value to Yaml calue:\n{:#?}",
+                                    err
+                                ),
+                                fix: None,
+                                url: None,
+                            }),
+                        }
                     }
                     FrontmatterCommands::Remove { property } => {
                         let _ = frontmatter.remove(String::from(property));
