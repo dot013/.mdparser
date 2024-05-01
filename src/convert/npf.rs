@@ -84,7 +84,10 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                 let mut post = Self::new(0);
                 let block_text = BlockText::from(String::from(t.clone()));
                 post.content.push(BlockValue::Text(block_text));
+
+                #[cfg(any(feature = "npf-runtime-asserts", test, debug_assertions))]
                 assert_npf_eq_node_text!(&post, &node);
+
                 Ok(post)
             }
             NodeValue::Heading(h) => {
@@ -120,7 +123,9 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                         }
                     });
 
+                #[cfg(any(feature = "npf-runtime-asserts", test, debug_assertions))]
                 assert_npf_eq_node_text!(&strong, &node);
+
                 Ok(strong)
             }
             NodeValue::Emph => {
@@ -133,7 +138,9 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                         }
                     });
 
+                #[cfg(any(feature = "npf-runtime-asserts", test, debug_assertions))]
                 assert_npf_eq_node_text!(&italic, &node);
+
                 Ok(italic)
             }
             NodeValue::Strikethrough => {
@@ -147,7 +154,9 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                         }
                     });
 
+                #[cfg(any(feature = "npf-runtime-asserts", test, debug_assertions))]
                 assert_npf_eq_node_text!(&strike_through, &node);
+
                 Ok(strike_through)
             }
             NodeValue::Link(link) => {

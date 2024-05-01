@@ -1,4 +1,5 @@
 /target
+/result*
 .vault-backup/
 test.md
 .direnv
