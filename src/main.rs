@@ -116,7 +116,7 @@ fn main() {
             LinksCommands::Replace { replace } => {
                 replace
                     .chunks(2)
-                    .for_each(|p| links::replace_links(ast, p[0].clone(), p[1].clone()));
+                    .for_each(|p| links::replace_links(ast, &p[0], &p[1]));
                 cli::ResultType::Markdown(ast)
             }
         },

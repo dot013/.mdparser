@@ -16,10 +16,10 @@ where
     });
 }
 
-pub fn replace_links<'a>(ast: &'a Node<'a, RefCell<Ast>>, from: String, to: String) {
+pub fn replace_links<'a>(ast: &'a Node<'a, RefCell<Ast>>, from: &'a str, to: &'a str) {
     iterate_links(ast, |l| {
         if l.url == from {
-            l.url = String::from(&to)
+            l.url = String::from(to)
         }
     });
 }
