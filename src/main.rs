@@ -46,6 +46,9 @@ enum FrontmatterCommands {
     Get {
         #[clap()]
         property: String,
+
+        #[arg(short = 'j', long, action = ArgAction::SetTrue)]
+        to_json: bool,
     },
 }
 
@@ -151,21 +154,36 @@ fn main() {
                         frontmatter.insert_ast(ast);
                         cli::ResultType::Markdown(ast)
                     }
-                    FrontmatterCommands::Get { property } => {
+                    FrontmatterCommands::Get { property, to_json } => {
                         let value = frontmatter
                             .get(String::from(property))
                             .unwrap_or(&serde_yaml::Value::Null);
-                        match serde_yaml::to_string(value) {
-                            Ok(s) => cli::ResultType::String(s),
-                            Err(err) => cli::ResultType::Err(cli::Error {
+
+                        let result = if *to_json {
+                            serde_json::to_string(value).map_err(|err| cli::Error {
                                 code: cli::ErrorCode::EPRSG,
                                 description: format!(
-                                    "Failed to parse frontmatter value to string\n{:#?}",
+                                    "Failed to parse frontmatter value to yaml string\n{:#?}",
                                     err
                                 ),
                                 fix: None,
                                 url: None,
-                            }),
+                            })
+                        } else {
+                            serde_yaml::to_string(value).map_err(|err| cli::Error {
+                                code: cli::ErrorCode::EPRSG,
+                                description: format!(
+                                    "Failed to parse frontmatter value to yaml string\n{:#?}",
+                                    err
+                                ),
+                                fix: None,
+                                url: None,
+                            })
+                        };
+
+                        match result {
+                            Ok(s) => cli::ResultType::String(s),
+                            Err(err) => cli::ResultType::Err(err),
                         }
                     }
                 },
