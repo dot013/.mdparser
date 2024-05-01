@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -47,6 +48,14 @@ enum FrontmatterCommands {
         #[clap()]
         property: String,
 
+        #[arg(short = 'j', long, action = ArgAction::SetTrue)]
+        to_json: bool,
+    },
+    Insert {
+        #[clap()]
+        value: String,
+    },
+    Extract {
         #[arg(short = 'j', long, action = ArgAction::SetTrue)]
         to_json: bool,
     },
@@ -186,6 +195,62 @@ fn main() {
                             Err(err) => cli::ResultType::Err(err),
                         }
                     }
+                    FrontmatterCommands::Insert { value } => {
+                        match serde_yaml::from_str::<HashMap<String, serde_yaml::Value>>(value) {
+                            Ok(value) => {
+                                frontmatter.extend(value);
+                                frontmatter.insert_ast(ast);
+                                cli::ResultType::Markdown(ast)
+                            }
+                            Err(err) => cli::ResultType::Err(cli::Error {
+                                code: cli::ErrorCode::EPRSG,
+                                description: format!(
+                                    "Error parsing input value to yaml file:\n{:#?}",
+                                    err
+                                ),
+                                fix: None,
+                                url: None,
+                            }),
+                        }
+                    }
+                    FrontmatterCommands::Extract { to_json } => match frontmatter.to_value() {
+                        Ok(value) => {
+                            let result = if *to_json {
+                                serde_json::to_string(&value).map_err(|err| cli::Error {
+                                    code: cli::ErrorCode::EPRSG,
+                                    description: format!(
+                                        "Failed to parse frontmatter value to yaml string\n{:#?}",
+                                        err
+                                    ),
+                                    fix: None,
+                                    url: None,
+                                })
+                            } else {
+                                serde_yaml::to_string(&value).map_err(|err| cli::Error {
+                                    code: cli::ErrorCode::EPRSG,
+                                    description: format!(
+                                        "Failed to parse frontmatter value to yaml string\n{:#?}",
+                                        err
+                                    ),
+                                    fix: None,
+                                    url: None,
+                                })
+                            };
+                            match result {
+                                Ok(s) => cli::ResultType::String(s),
+                                Err(err) => cli::ResultType::Err(err),
+                            }
+                        }
+                        Err(err) => cli::ResultType::Err(cli::Error {
+                            code: cli::ErrorCode::EPRSG,
+                            description: format!(
+                                "Error parsing Markdown to yaml file:\n{:#?}",
+                                err
+                            ),
+                            fix: None,
+                            url: None,
+                        }),
+                    },
                 },
                 Err(err) => cli::ResultType::Err(cli::Error {
                     code: cli::ErrorCode::EPRSG,

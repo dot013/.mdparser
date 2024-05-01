@@ -43,6 +43,12 @@ impl<'a> Frontmatter {
     pub fn get(&self, key: String) -> Option<&yaml::Value> {
         self.map.get(&key)
     }
+    pub fn extend<T>(&mut self, iter: T)
+    where
+        T: IntoIterator<Item = (String, yaml::Value)>,
+    {
+        self.map.extend(iter)
+    }
     pub fn insert_ast(&self, ast: &'a AstNode<'a>) {
         if let NodeValue::FrontMatter(ref mut f) = &mut ast.data.borrow_mut().value {
             *f = self.to_string();
@@ -51,6 +57,9 @@ impl<'a> Frontmatter {
                 self.insert_ast(c)
             }
         }
+    }
+    pub fn to_value(&self) -> Result<yaml::Value, yaml::Error> {
+        yaml::to_value(&self.map)
     }
 }
 
