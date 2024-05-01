@@ -2,12 +2,10 @@ name: Tests
 on: push
 jobs:
   test:
-    runs-on: alpine-plus
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        run: |
-          git clone --depth 1 \
-            http://${{ github.repository_owner }}:${{ secrets.GITHUB_TOKEN }}@${{ secrets.FORGEJO_DOMAIN }}/dot013/.mdparser
+        uses: actions/checkout@v4
       - name: Install nix
         uses: actions/nix-quick-install-action@v27
       - name: Setup cachix
