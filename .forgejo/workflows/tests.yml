@@ -9,6 +9,6 @@ jobs:
       - name: Install nix
         uses: actions/nix-quick-install-action@v27
       - name: Setup cachix
-        uses: actions/cachix-action
+        uses: actions/cachix-action@master
       - name: Test crate
         run: cargo test
