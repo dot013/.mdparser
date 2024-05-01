@@ -2,10 +2,11 @@ name: Tests
 on: push
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: alpine-node
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        run: git clone --depth 1 \
+            http://${{ github.repository_owner }}:${{ secrets.GITHUB_TOKEN }}@${{ secrets.FORGEJO_DOMAIN }}/dot013/.vault
       - name: Install nix
         uses: actions/nix-quick-install-action@v27
       - name: Setup cachix
