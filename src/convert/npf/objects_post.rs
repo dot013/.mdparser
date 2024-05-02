@@ -84,9 +84,11 @@ impl Post {
             })
             .flatten()
             .collect::<Vec<_>>();
-        let block = &mut self.content[0];
-        if let BlockValue::Text(ref mut t) = block {
-            t.text = String::from(t.text.strip_suffix(sep).unwrap_or(&t.text));
+        if self.content.len() > 0 {
+            let block = &mut self.content[0];
+            if let BlockValue::Text(ref mut t) = block {
+                t.text = String::from(t.text.strip_suffix(sep).unwrap_or(&t.text));
+            }
         }
         self
     }
