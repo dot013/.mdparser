@@ -77,7 +77,10 @@ impl<'a> TryFrom<&'a Node<'a, RefCell<Ast>>> for objects::Post {
                 Ok(p)
             }
             NodeValue::BlockQuote => {
-                let p = Self::try_from(node.children())?.join_content("\n\n");
+                let mut p = Self::try_from(node.children())?.join_content("\n\n");
+                if let BlockValue::Text(ref mut t) = &mut p.content[0] {
+                    t.subtype = Some(BlockTextSubtype::Indented);
+                }
                 Ok(p)
             }
             NodeValue::Text(t) => {
