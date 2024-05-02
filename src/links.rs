@@ -41,3 +41,40 @@ pub fn get_links<'a>(ast: &'a Node<'a, RefCell<Ast>>) -> Vec<String> {
     let r = links.borrow().to_vec();
     r
 }
+
+pub fn iterate_images<'a, F>(ast: &'a Node<'a, RefCell<Ast>>, iterator: F)
+where
+    F: Fn(&mut NodeLink),
+{
+    utils::iter_nodes(ast, &|node| {
+        if let NodeValue::Image(ref mut l) = &mut node.data.borrow_mut().value {
+            iterator(l);
+        };
+    });
+}
+
+pub fn replace_images<'a>(ast: &'a Node<'a, RefCell<Ast>>, from: &'a str, to: &'a str) {
+    iterate_images(ast, |l| {
+        if l.url == from {
+            l.url = String::from(to)
+        }
+    });
+}
+
+pub fn remove_image<'a>(ast: &'a Node<'a, RefCell<Ast>>, url: &'a str) {
+    utils::iter_nodes(ast, &|node| {
+        if let NodeValue::Image(ref mut l) = &mut node.data.borrow_mut().value {
+            if l.url == url {
+                node.children().for_each(|n| node.insert_before(n));
+                node.detach();
+            }
+        }
+    })
+}
+
+pub fn get_images<'a>(ast: &'a Node<'a, RefCell<Ast>>) -> Vec<String> {
+    let images: RefCell<Vec<String>> = RefCell::new(vec![]);
+    iterate_images(ast, |l| images.borrow_mut().push(l.url.clone()));
+    let r = images.borrow().to_vec();
+    r
+}

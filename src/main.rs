@@ -75,10 +75,27 @@ enum LinksCommands {
 }
 
 #[derive(Debug, Subcommand)]
+enum ImagesCommands {
+    List {},
+    Replace {
+        #[clap(num_args = 2, value_names = ["FROM", "TO"], required = true)]
+        replace: Vec<String>,
+    },
+    Remove {
+        #[clap(num_args = 1, value_names = ["URL"], required = true)]
+        images: Vec<String>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
 enum Commands {
     Links {
         #[command(subcommand)]
         command: LinksCommands,
+    },
+    Images {
+        #[command(subcommand)]
+        command: ImagesCommands,
     },
     Frontmatter {
         #[command(subcommand)]
@@ -125,6 +142,19 @@ fn main() {
             }
             LinksCommands::Remove { links } => {
                 links.iter().for_each(|l| links::remove_link(ast, l));
+                cli::ResultType::Markdown(ast)
+            }
+        },
+        Commands::Images { command } => match command {
+            ImagesCommands::List {} => cli::ResultType::List(links::get_images(ast)),
+            ImagesCommands::Replace { replace } => {
+                replace
+                    .chunks(2)
+                    .for_each(|p| links::replace_images(ast, &p[0], &p[1]));
+                cli::ResultType::Markdown(ast)
+            }
+            ImagesCommands::Remove { images } => {
+                images.iter().for_each(|l| links::remove_image(ast, l));
                 cli::ResultType::Markdown(ast)
             }
         },
